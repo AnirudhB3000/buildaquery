@@ -2,3 +2,4 @@ venv/
 GEMINI.md
 **/__pycache__/
 **/.env
+dist/
