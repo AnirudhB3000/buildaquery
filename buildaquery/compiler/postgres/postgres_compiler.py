@@ -22,13 +22,19 @@ from buildaquery.abstract_syntax_tree.models import (
     DeleteStatementNode,
     InsertStatementNode,
     UpdateStatementNode,
+    ColumnDefinitionNode,
+    CreateStatementNode,
+    DropStatementNode,
     UnionNode,
     IntersectNode,
     ExceptNode,
     InNode,
     BetweenNode,
     CaseExpressionNode,
-    WhenThenNode
+    WhenThenNode,
+    SubqueryNode,
+    CTENode,
+    OverClauseNode
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -76,7 +82,14 @@ class PostgresCompiler(Visitor):
         if node.top_clause and (node.limit is not None or node.offset is not None):
             raise ValueError("TOP clause is mutually exclusive with LIMIT and OFFSET.")
 
-        parts: list[str] = ["SELECT"]
+        parts: list[str] = []
+
+        # 0. CTEs (WITH Clause)
+        if node.ctes:
+            cte_sqls = [self.visit(cte) for cte in node.ctes]
+            parts.append(f"WITH {', '.join(cte_sqls)}")
+
+        parts.append("SELECT")
 
         if node.distinct:
             parts.append("DISTINCT")
@@ -128,6 +141,12 @@ class PostgresCompiler(Visitor):
 
         return " ".join(parts)
 
+    def visit_CTENode(self, node: CTENode) -> str:
+        """
+        Compiles a CTE (name AS (subquery)).
+        """
+        return f"{node.name} AS ({self.visit(node.subquery)})"
+
     def visit_DeleteStatementNode(self, node: DeleteStatementNode) -> str:
         """
         Compiles a DELETE statement.
@@ -161,6 +180,37 @@ class PostgresCompiler(Visitor):
             parts.append(self.visit(node.where_clause))
         
         return " ".join(parts)
+
+    def visit_CreateStatementNode(self, node: CreateStatementNode) -> str:
+        """
+        Compiles a CREATE TABLE statement.
+        """
+        if_not_exists = " IF NOT EXISTS" if node.if_not_exists else ""
+        table = self.visit(node.table)
+        cols = ", ".join([self.visit(c) for c in node.columns])
+        return f"CREATE TABLE{if_not_exists} {table} ({cols})"
+
+    def visit_ColumnDefinitionNode(self, node: ColumnDefinitionNode) -> str:
+        """
+        Compiles a column definition.
+        """
+        parts = [node.name, node.data_type]
+        if node.primary_key:
+            parts.append("PRIMARY KEY")
+        if node.not_null:
+            parts.append("NOT NULL")
+        if node.default:
+            parts.append(f"DEFAULT {self.visit(node.default)}")
+        return " ".join(parts)
+
+    def visit_DropStatementNode(self, node: DropStatementNode) -> str:
+        """
+        Compiles a DROP TABLE statement.
+        """
+        if_exists = " IF EXISTS" if node.if_exists else ""
+        table = self.visit(node.table)
+        cascade = " CASCADE" if node.cascade else ""
+        return f"DROP TABLE{if_exists} {table}{cascade}"
 
     def visit_UnionNode(self, node: UnionNode) -> str:
         """
@@ -215,7 +265,25 @@ class PostgresCompiler(Visitor):
 
     def visit_FunctionCallNode(self, node: FunctionCallNode) -> str:
         args = ", ".join([self.visit(arg) for arg in node.args])
-        return f"{node.name}({args})"
+        sql = f"{node.name}({args})"
+        if node.over:
+            sql += f" OVER {self.visit(node.over)}"
+        return sql
+
+    def visit_OverClauseNode(self, node: OverClauseNode) -> str:
+        """
+        Compiles an OVER clause.
+        """
+        parts = []
+        if node.partition_by:
+            exprs = ", ".join([self.visit(expr) for expr in node.partition_by])
+            parts.append(f"PARTITION BY {exprs}")
+        
+        if node.order_by:
+            exprs = ", ".join([self.visit(item) for item in node.order_by])
+            parts.append(f"ORDER BY {exprs}")
+        
+        return f"({' '.join(parts)})"
 
     def visit_UnaryOperationNode(self, node: UnaryOperationNode) -> str:
         return f"({node.operator} {self.visit(node.operand)})"
@@ -256,6 +324,15 @@ class PostgresCompiler(Visitor):
         Compiles a WHEN ... THEN ... clause.
         """
         return f"WHEN {self.visit(node.condition)} THEN {self.visit(node.result)}"
+
+    def visit_SubqueryNode(self, node: SubqueryNode) -> str:
+        """
+        Compiles a subquery.
+        """
+        sql = f"({self.visit(node.statement)})"
+        if node.alias:
+            sql += f" AS {node.alias}"
+        return sql
 
     # --------------------------------------------------
     # Clause Nodes

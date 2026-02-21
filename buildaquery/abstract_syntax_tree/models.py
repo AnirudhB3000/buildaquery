@@ -66,6 +66,14 @@ class FromClauseNode(ASTNode):
     pass
 
 @dataclass
+class SubqueryNode(ExpressionNode, FromClauseNode):
+    """
+    Represents a subquery that can be used in an expression or a FROM clause.
+    """
+    statement: 'SelectStatementNode'
+    alias: str | None = None
+
+@dataclass
 class JoinClauseNode(FromClauseNode):
     """
     Represents a JOIN clause in the AST.
@@ -108,6 +116,12 @@ class AliasNode(ExpressionNode):
     name: str
 
 @dataclass
+class OverClauseNode(ASTNode):
+    """Represents an OVER clause for window functions."""
+    partition_by: list[ExpressionNode] | None = None
+    order_by: list[OrderByClauseNode] | None = None
+
+@dataclass
 class CastNode(ExpressionNode):
     """Represents a type cast (e.g., 'CAST(column AS type)' or 'column::type')."""
     expression: ExpressionNode
@@ -118,6 +132,7 @@ class FunctionCallNode(ExpressionNode):
     """Represents a function call (e.g., COUNT(*), MAX(price))."""
     name: str
     args: list[ExpressionNode]
+    over: OverClauseNode | None = None # optional OVER clause for window functions
 
 @dataclass
 class UnaryOperationNode(ExpressionNode):
@@ -173,12 +188,19 @@ class HavingClauseNode(ASTNode):
     condition: ExpressionNode
 
 @dataclass
+class CTENode(ASTNode):
+    """Represents a Common Table Expression (WITH clause)."""
+    name: str
+    subquery: 'SelectStatementNode'
+
+@dataclass
 class SelectStatementNode(StatementNode):
     """
     Represents a SELECT statement in the AST.
     """
     select_list: list[ExpressionNode] # list of expressions to select (eg: columns, functions, etc.)
     distinct: bool = False # toggle between SELECT ALL and SELECT DISTINCT
+    ctes: list[CTENode] | None = None # optional list of Common Table Expressions
     from_table: FromClauseNode | None = None # the table to select from, optional for edge cases
     where_clause: WhereClauseNode | None = None # optional where clause for filtering results
     group_by: GroupByClauseNode | None = None # optional group by clause for aggregation
@@ -195,6 +217,29 @@ class DeleteStatementNode(StatementNode):
     """
     table: TableNode
     where_clause: WhereClauseNode | None = None
+
+@dataclass
+class ColumnDefinitionNode(ASTNode):
+    """Represents a column definition in a CREATE TABLE statement."""
+    name: str
+    data_type: str
+    primary_key: bool = False
+    not_null: bool = False
+    default: ExpressionNode | None = None
+
+@dataclass
+class CreateStatementNode(StatementNode):
+    """Represents a CREATE TABLE statement."""
+    table: TableNode
+    columns: list[ColumnDefinitionNode]
+    if_not_exists: bool = False
+
+@dataclass
+class DropStatementNode(StatementNode):
+    """Represents a DROP TABLE statement."""
+    table: TableNode
+    if_exists: bool = False
+    cascade: bool = False
 
 @dataclass
 class InsertStatementNode(StatementNode):

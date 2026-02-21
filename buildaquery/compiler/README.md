@@ -24,7 +24,11 @@ The initial implementation supports PostgreSQL.
 - **DISTINCT Support**: Handles `SELECT DISTINCT` queries.
 - **DML Support**: Supports `INSERT`, `UPDATE`, and `DELETE` operations.
 - **Set Operations**: Support for `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL`).
+- **CTEs**: Support for `WITH` clauses.
 - **Specialized Expressions**: Support for `IN`, `BETWEEN`, and `CASE`.
+- **Subqueries**: Support for subqueries in `FROM` and `WHERE` clauses.
+- **Window Functions**: Support for `OVER` clauses, `PARTITION BY`, and `ORDER BY`.
+- **DDL Support**: Support for `CREATE TABLE` and `DROP TABLE`.
 - **Qualified Names**: Supports `schema.table` and `table.column` naming conventions.
 - **Type Casting**: Supports `CAST(expression AS type)`.
 - **Clause Ordering**: Ensures `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT` are placed in the correct sequence.

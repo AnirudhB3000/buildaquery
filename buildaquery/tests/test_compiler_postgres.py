@@ -6,7 +6,9 @@ from buildaquery.abstract_syntax_tree.models import (
     OrderByClauseNode, GroupByClauseNode, HavingClauseNode, CastNode,
     DeleteStatementNode, UnionNode, IntersectNode, ExceptNode,
     InNode, BetweenNode, InsertStatementNode, UpdateStatementNode,
-    CaseExpressionNode, WhenThenNode
+    CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
+    OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
+    CreateStatementNode, DropStatementNode
 )
 
 @pytest.fixture
@@ -170,6 +172,88 @@ def test_compile_case_expression(compiler):
     expected_sql = "SELECT CASE WHEN (score > %s) THEN %s WHEN (score > %s) THEN %s ELSE %s END FROM students"
     assert compiled.sql == expected_sql
     assert compiled.params == [90, "A", 80, "B", "C"]
+
+def test_compile_subquery(compiler):
+    # Subquery in FROM clause
+    inner_select = SelectStatementNode(select_list=[ColumnNode(name="id")], from_table=TableNode(name="users"))
+    subquery = SubqueryNode(statement=inner_select, alias="u")
+    
+    query = SelectStatementNode(
+        select_list=[StarNode()],
+        from_table=subquery
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "SELECT * FROM (SELECT id FROM users) AS u"
+
+    # Subquery in WHERE clause (e.g., IN subquery)
+    query_in = SelectStatementNode(
+        select_list=[StarNode()],
+        from_table=TableNode(name="orders"),
+        where_clause=WhereClauseNode(
+            condition=InNode(
+                expression=ColumnNode(name="user_id"),
+                values=[SubqueryNode(statement=inner_select)]
+            )
+        )
+    )
+    compiled_in = compiler.compile(query_in)
+    assert compiled_in.sql == "SELECT * FROM orders WHERE (user_id IN ((SELECT id FROM users)))"
+
+def test_compile_cte(compiler):
+    inner_select = SelectStatementNode(select_list=[StarNode()], from_table=TableNode(name="users"))
+    cte = CTENode(name="user_subset", subquery=inner_select)
+    
+    query = SelectStatementNode(
+        select_list=[StarNode()],
+        from_table=TableNode(name="user_subset"),
+        ctes=[cte]
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "WITH user_subset AS (SELECT * FROM users) SELECT * FROM user_subset"
+
+def test_compile_window_function(compiler):
+    query = SelectStatementNode(
+        select_list=[
+            ColumnNode(name="name"),
+            FunctionCallNode(
+                name="SUM",
+                args=[ColumnNode(name="salary")],
+                over=OverClauseNode(
+                    partition_by=[ColumnNode(name="dept")],
+                    order_by=[OrderByClauseNode(expression=ColumnNode(name="id"))]
+                )
+            )
+        ],
+        from_table=TableNode(name="employees")
+    )
+    compiled = compiler.compile(query)
+    expected_sql = "SELECT name, SUM(salary) OVER (PARTITION BY dept ORDER BY id ASC) FROM employees"
+    assert compiled.sql == expected_sql
+
+def test_compile_ddl(compiler):
+    # Test CREATE TABLE
+    create_query = CreateStatementNode(
+        table=TableNode(name="users"),
+        columns=[
+            ColumnDefinitionNode(name="id", data_type="SERIAL", primary_key=True),
+            ColumnDefinitionNode(name="name", data_type="TEXT", not_null=True),
+            ColumnDefinitionNode(name="age", data_type="INTEGER", default=LiteralNode(value=18))
+        ],
+        if_not_exists=True
+    )
+    compiled_create = compiler.compile(create_query)
+    expected_create = "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, age INTEGER DEFAULT %s)"
+    assert compiled_create.sql == expected_create
+    assert compiled_create.params == [18]
+
+    # Test DROP TABLE
+    drop_query = DropStatementNode(
+        table=TableNode(name="users"),
+        if_exists=True,
+        cascade=True
+    )
+    compiled_drop = compiler.compile(drop_query)
+    assert compiled_drop.sql == "DROP TABLE IF EXISTS users CASCADE"
 
 def test_compile_where_with_params(compiler):
     query = SelectStatementNode(
