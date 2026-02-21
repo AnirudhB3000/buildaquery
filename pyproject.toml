@@ -15,6 +15,7 @@ pluggy = "1.6.0"
 Pygments = "2.19.2"
 typing_extensions = "4.15.0"
 tzdata = "2025.3"
+python-dotenv = "^1.2.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "9.0.2"
