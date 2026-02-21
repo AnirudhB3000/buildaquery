@@ -1,0 +1,11 @@
+services:
+  test_db:
+    image: postgres:15
+    container_name: buildaquery_test_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: buildaquery_test
+    ports:
+      - "5433:5432"
+    restart: always

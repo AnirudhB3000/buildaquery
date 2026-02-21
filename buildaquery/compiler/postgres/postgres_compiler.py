@@ -339,9 +339,12 @@ class PostgresCompiler(Visitor):
     # --------------------------------------------------
 
     def visit_TableNode(self, node: TableNode) -> str:
+        name = node.name
         if node.schema:
-            return f"{node.schema}.{node.name}"
-        return node.name
+            name = f"{node.schema}.{name}"
+        if node.alias:
+            name = f"{name} AS {node.alias}"
+        return name
 
     def visit_JoinClauseNode(self, node: JoinClauseNode) -> str:
         left = self.visit(node.left)

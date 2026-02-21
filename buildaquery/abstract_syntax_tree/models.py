@@ -108,6 +108,7 @@ class TableNode(FromClauseNode):
     """
     name: str
     schema: str | None = None
+    alias: str | None = None
 
 @dataclass
 class AliasNode(ExpressionNode):

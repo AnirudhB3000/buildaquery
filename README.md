@@ -28,7 +28,13 @@ To execute the unit test suite, run the following command from the root director
 $env:PYTHONPATH='.'; .\venv\Scripts\python.exe -m pytest buildaquery/tests
 ```
 
-To run integration tests:
+To run integration tests, you must first start the test database:
+
+```powershell
+docker-compose up -d
+```
+
+Then run the integration suite:
 
 ```powershell
 $env:PYTHONPATH='.'; .\venv\Scripts\python.exe -m pytest tests

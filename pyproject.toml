@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "buildaquery"
+version = "0.1.0"
+description = "A Python-based query builder for PostgreSQL."
+authors = ["Anirudh Bhattacharya anirudhbhattacharya1@gmail.com"]
+readme = "README.md"
+packages = [{include = "buildaquery"}, {include = "scripts"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+psycopg = "3.3.3"
+colorama = "0.4.6"
+packaging = "26.0"
+pluggy = "1.6.0"
+Pygments = "2.19.2"
+typing_extensions = "4.15.0"
+tzdata = "2025.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "9.0.2"
+pytest-mock = "3.15.1"
+iniconfig = "2.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests", "buildaquery/tests"]
+
+[tool.poetry.scripts]
+unit-tests = "scripts:run_unit_tests"
+integration-tests = "scripts:run_integration_tests"
+all-tests = "scripts:run_all_tests"
+clean = "scripts:clean_project"
