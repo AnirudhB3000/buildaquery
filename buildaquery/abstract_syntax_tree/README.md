@@ -34,3 +34,21 @@ query = SelectStatementNode(
 ```
 
 This tree can then be processed by visitors (see the `traversal` module) for compilation or analysis.
+
+## TODOs
+
+To make the AST more robust and capable of representing the full scope of the SQL language, the following enhancements are planned:
+
+- **DML Support**:
+    - [x] Implement `InsertStatementNode` and `UpdateStatementNode`.
+    - [x] Implement `DeleteStatementNode`.
+- **Advanced Query Features**:
+    - **CTEs**: Add `WithClauseNode` for common table expressions.
+    - [x] **Set Operations**: Implement `UnionNode`, `IntersectNode`, and `ExceptNode`.
+    - [x] **DISTINCT**: Add support for `SELECT DISTINCT`.
+- **Richer Expression Logic**:
+    - **Specialized Expressions**: Add [x] `CaseExpressionNode`, [x] `InNode`, and [x] `BetweenNode`.
+    - **Subqueries**: Enable `SelectStatementNode` to be used within expressions.
+    - **Window Functions**: Support `OVER` clauses and partitioning.
+    - [x] **Schema & Namespacing**: Update `TableNode` and `ColumnNode` to support qualified names (e.g., `schema.table`) and add a `CastNode` for type casting.
+- **DDL Support**: Add nodes for `CREATE`, `ALTER`, and `DROP` statements for schema management.

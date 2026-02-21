@@ -21,6 +21,12 @@ To prevent SQL injection, the compilers are designed to automatically parametriz
 The initial implementation supports PostgreSQL.
 
 #### Key Features:
+- **DISTINCT Support**: Handles `SELECT DISTINCT` queries.
+- **DML Support**: Supports `INSERT`, `UPDATE`, and `DELETE` operations.
+- **Set Operations**: Support for `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL`).
+- **Specialized Expressions**: Support for `IN`, `BETWEEN`, and `CASE`.
+- **Qualified Names**: Supports `schema.table` and `table.column` naming conventions.
+- **Type Casting**: Supports `CAST(expression AS type)`.
 - **Clause Ordering**: Ensures `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT` are placed in the correct sequence.
 - **TOP Translation**: Automatically translates `TopClauseNode` into PostgreSQL-compliant `LIMIT` and `ORDER BY` logic.
 - **Mutual Exclusivity Enforcement**: Raises a `ValueError` if a query attempts to use both `TOP` and standard `LIMIT/OFFSET`.

@@ -36,6 +36,7 @@ class ColumnNode(ExpressionNode):
     Represents a column reference in the AST.
     """
     name: str
+    table: str | None = None
 
 @dataclass
 class BinaryOperationNode(ExpressionNode):
@@ -98,12 +99,19 @@ class TableNode(FromClauseNode):
     Represents a table reference in the AST.
     """
     name: str
+    schema: str | None = None
 
 @dataclass
 class AliasNode(ExpressionNode):
     """Represents an aliased expression (e.g., 'column AS new_name')."""
     expression: ExpressionNode
     name: str
+
+@dataclass
+class CastNode(ExpressionNode):
+    """Represents a type cast (e.g., 'CAST(column AS type)' or 'column::type')."""
+    expression: ExpressionNode
+    data_type: str
 
 @dataclass
 class FunctionCallNode(ExpressionNode):
@@ -116,6 +124,33 @@ class UnaryOperationNode(ExpressionNode):
     """Represents a unary operation (e.g., NOT, -)."""
     operator: str
     operand: ExpressionNode
+
+@dataclass
+class InNode(ExpressionNode):
+    """Represents an IN expression (e.g., 'column IN (1, 2, 3)')."""
+    expression: ExpressionNode
+    values: list[ExpressionNode]
+    negated: bool = False
+
+@dataclass
+class WhenThenNode(ASTNode):
+    """Represents a WHEN ... THEN ... clause in a CASE expression."""
+    condition: ExpressionNode
+    result: ExpressionNode
+
+@dataclass
+class CaseExpressionNode(ExpressionNode):
+    """Represents a CASE expression (e.g., 'CASE WHEN cond THEN res ELSE default END')."""
+    cases: list[WhenThenNode]
+    else_result: ExpressionNode | None = None
+
+@dataclass
+class BetweenNode(ExpressionNode):
+    """Represents a BETWEEN expression (e.g., 'column BETWEEN 1 AND 10')."""
+    expression: ExpressionNode
+    low: ExpressionNode
+    high: ExpressionNode
+    negated: bool = False
 
 @dataclass
 class StarNode(ExpressionNode):
@@ -143,6 +178,7 @@ class SelectStatementNode(StatementNode):
     Represents a SELECT statement in the AST.
     """
     select_list: list[ExpressionNode] # list of expressions to select (eg: columns, functions, etc.)
+    distinct: bool = False # toggle between SELECT ALL and SELECT DISTINCT
     from_table: FromClauseNode | None = None # the table to select from, optional for edge cases
     where_clause: WhereClauseNode | None = None # optional where clause for filtering results
     group_by: GroupByClauseNode | None = None # optional group by clause for aggregation
@@ -151,3 +187,53 @@ class SelectStatementNode(StatementNode):
     top_clause: TopClauseNode | None = None # optional top clause, mutually exclusive with limit and offset
     limit: int | None = None # optional limit for number of results to return
     offset: int | None = None # optional offset for skipping results
+
+@dataclass
+class DeleteStatementNode(StatementNode):
+    """
+    Represents a DELETE statement in the AST.
+    """
+    table: TableNode
+    where_clause: WhereClauseNode | None = None
+
+@dataclass
+class InsertStatementNode(StatementNode):
+    """
+    Represents an INSERT statement in the AST.
+    """
+    table: TableNode
+    values: list[ExpressionNode]
+    columns: list[ColumnNode] | None = None
+
+@dataclass
+class UpdateStatementNode(StatementNode):
+    """
+    Represents an UPDATE statement in the AST.
+    """
+    table: TableNode
+    set_clauses: dict[str, ExpressionNode] # Map column names to new values/expressions
+    where_clause: WhereClauseNode | None = None
+
+@dataclass
+class SetOperationNode(StatementNode):
+    """
+    Base class for set operations like UNION, INTERSECT, EXCEPT.
+    """
+    left: StatementNode
+    right: StatementNode
+    all: bool = False
+
+@dataclass
+class UnionNode(SetOperationNode):
+    """Represents a UNION operation."""
+    pass
+
+@dataclass
+class IntersectNode(SetOperationNode):
+    """Represents an INTERSECT operation."""
+    pass
+
+@dataclass
+class ExceptNode(SetOperationNode):
+    """Represents an EXCEPT operation."""
+    pass

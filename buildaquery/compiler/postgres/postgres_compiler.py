@@ -16,8 +16,19 @@ from buildaquery.abstract_syntax_tree.models import (
     GroupByClauseNode,
     HavingClauseNode,
     AliasNode,
+    CastNode,
     FunctionCallNode,
     UnaryOperationNode,
+    DeleteStatementNode,
+    InsertStatementNode,
+    UpdateStatementNode,
+    UnionNode,
+    IntersectNode,
+    ExceptNode,
+    InNode,
+    BetweenNode,
+    CaseExpressionNode,
+    WhenThenNode
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -67,6 +78,9 @@ class PostgresCompiler(Visitor):
 
         parts: list[str] = ["SELECT"]
 
+        if node.distinct:
+            parts.append("DISTINCT")
+
         # 1. Select List
         select_list_sql = ", ".join([self.visit(item) for item in node.select_list])
         parts.append(select_list_sql)
@@ -114,11 +128,68 @@ class PostgresCompiler(Visitor):
 
         return " ".join(parts)
 
+    def visit_DeleteStatementNode(self, node: DeleteStatementNode) -> str:
+        """
+        Compiles a DELETE statement.
+        """
+        parts = ["DELETE FROM", self.visit(node.table)]
+        if node.where_clause:
+            parts.append(self.visit(node.where_clause))
+        return " ".join(parts)
+
+    def visit_InsertStatementNode(self, node: InsertStatementNode) -> str:
+        """
+        Compiles an INSERT statement.
+        """
+        table = self.visit(node.table)
+        cols = ""
+        if node.columns:
+            cols = f" ({', '.join([c.name for c in node.columns])})"
+        
+        vals = ", ".join([self.visit(v) for v in node.values])
+        return f"INSERT INTO {table}{cols} VALUES ({vals})"
+
+    def visit_UpdateStatementNode(self, node: UpdateStatementNode) -> str:
+        """
+        Compiles an UPDATE statement.
+        """
+        table = self.visit(node.table)
+        sets = ", ".join([f"{col} = {self.visit(expr)}" for col, expr in node.set_clauses.items()])
+        
+        parts = [f"UPDATE {table} SET {sets}"]
+        if node.where_clause:
+            parts.append(self.visit(node.where_clause))
+        
+        return " ".join(parts)
+
+    def visit_UnionNode(self, node: UnionNode) -> str:
+        """
+        Compiles a UNION operation.
+        """
+        op = "UNION ALL" if node.all else "UNION"
+        return f"({self.visit(node.left)} {op} {self.visit(node.right)})"
+
+    def visit_IntersectNode(self, node: IntersectNode) -> str:
+        """
+        Compiles an INTERSECT operation.
+        """
+        op = "INTERSECT ALL" if node.all else "INTERSECT"
+        return f"({self.visit(node.left)} {op} {self.visit(node.right)})"
+
+    def visit_ExceptNode(self, node: ExceptNode) -> str:
+        """
+        Compiles an EXCEPT operation.
+        """
+        op = "EXCEPT ALL" if node.all else "EXCEPT"
+        return f"({self.visit(node.left)} {op} {self.visit(node.right)})"
+
     # --------------------------------------------------
     # Expression Nodes
     # --------------------------------------------------
 
     def visit_ColumnNode(self, node: ColumnNode) -> str:
+        if node.table:
+            return f"{node.table}.{node.name}"
         return node.name
 
     def visit_LiteralNode(self, node: LiteralNode) -> str:
@@ -139,6 +210,9 @@ class PostgresCompiler(Visitor):
     def visit_AliasNode(self, node: AliasNode) -> str:
         return f"{self.visit(node.expression)} AS {node.name}"
 
+    def visit_CastNode(self, node: CastNode) -> str:
+        return f"CAST({self.visit(node.expression)} AS {node.data_type})"
+
     def visit_FunctionCallNode(self, node: FunctionCallNode) -> str:
         args = ", ".join([self.visit(arg) for arg in node.args])
         return f"{node.name}({args})"
@@ -146,11 +220,50 @@ class PostgresCompiler(Visitor):
     def visit_UnaryOperationNode(self, node: UnaryOperationNode) -> str:
         return f"({node.operator} {self.visit(node.operand)})"
 
+    def visit_InNode(self, node: InNode) -> str:
+        """
+        Compiles an IN expression.
+        """
+        expr = self.visit(node.expression)
+        vals = ", ".join([self.visit(v) for v in node.values])
+        op = "NOT IN" if node.negated else "IN"
+        return f"({expr} {op} ({vals}))"
+
+    def visit_BetweenNode(self, node: BetweenNode) -> str:
+        """
+        Compiles a BETWEEN expression.
+        """
+        expr = self.visit(node.expression)
+        low = self.visit(node.low)
+        high = self.visit(node.high)
+        op = "NOT BETWEEN" if node.negated else "BETWEEN"
+        return f"({expr} {op} {low} AND {high})"
+
+    def visit_CaseExpressionNode(self, node: CaseExpressionNode) -> str:
+        """
+        Compiles a CASE expression.
+        """
+        parts = ["CASE"]
+        for case in node.cases:
+            parts.append(self.visit(case))
+        if node.else_result:
+            parts.append(f"ELSE {self.visit(node.else_result)}")
+        parts.append("END")
+        return " ".join(parts)
+
+    def visit_WhenThenNode(self, node: WhenThenNode) -> str:
+        """
+        Compiles a WHEN ... THEN ... clause.
+        """
+        return f"WHEN {self.visit(node.condition)} THEN {self.visit(node.result)}"
+
     # --------------------------------------------------
     # Clause Nodes
     # --------------------------------------------------
 
     def visit_TableNode(self, node: TableNode) -> str:
+        if node.schema:
+            return f"{node.schema}.{node.name}"
         return node.name
 
     def visit_JoinClauseNode(self, node: JoinClauseNode) -> str:

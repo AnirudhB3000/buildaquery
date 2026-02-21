@@ -4,7 +4,12 @@ This sub-module provides the concrete implementation of the SQL compiler for Pos
 
 ## Features
 
-- **Standard SELECT Support**: Compiles columns, tables, and joins.
+- **Standard DML Support**: Compiles `SELECT`, `INSERT`, `UPDATE`, and `DELETE` statements.
+- **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (and their `ALL` variants).
+- **Specialized Expressions**: Supports `IN`, `BETWEEN`, and `CASE` operators.
+- **DISTINCT**: Supports `SELECT DISTINCT`.
+- **Qualified Names**: Handles `schema.table` and `table.column` identifiers.
+- **Type Casting**: Supports `CAST(expression AS type)`.
 - **Filtering**: Translates `WhereClauseNode` and complex binary/unary operations.
 - **Parametrization**: Automatically uses `%s` placeholders for all literal values to ensure security.
 - **Dialect Specifics**: 
