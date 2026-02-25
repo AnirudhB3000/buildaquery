@@ -1,10 +1,10 @@
 # Build-a-Query Project Goals
 
-This project aims to create a query builder for Python with support for PostgreSQL and SQLite. The development process is broken down into the following stages: 
+This project aims to create a query builder for Python with support for PostgreSQL, SQLite, and MySQL. The development process is broken down into the following stages: 
 
 1.  **Abstract Syntax Tree (AST):** Define and build the necessary data structures to represent queries as an AST.
 2.  **AST Traversal:** Implement mechanisms for traversing the AST to analyze, modify, and process the query structure.
-3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL and SQLite.
+3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, and MySQL.
 4.  **Execution Layer:** Create layers responsible for executing the compiled SQL queries against the target databases.
 
 ---
@@ -68,6 +68,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added helper scripts to create the SQLite DB: `scripts/create_sqlite_db.ps1` and `scripts/create_sqlite_db.sh`.
     *   Added `setup-tests` Poetry script to bootstrap Postgres (Docker) and SQLite DB setup.
     *   Introduced shared `CompiledQuery` in `buildaquery/compiler/compiled_query.py`.
+*   **MySQL Support**:
+    *   Implemented `MySqlCompiler` with MySQL-compatible placeholders (`%s`) and dialect notes.
+    *   Implemented `MySqlExecutor` using `mysql-connector-python`.
+    *   Added MySQL unit tests and integration tests using Docker (`mysql:8.0`) on port `3307`.
+    *   Extended integration test fixtures to manage MySQL connections and schema lifecycle.
 
 ---
 
@@ -81,7 +86,7 @@ This project aims to create a query builder for Python with support for PostgreS
 ### Architecture & Logic
 *   **AST Traversal:** Strictly adhere to the **Visitor Pattern**.
 *   **Compilation**: Favor **post-order traversal** to ensure sub-expressions resolve before parent nodes.
-*   **Execution**: Use `PostgresExecutor` for PostgreSQL and `SqliteExecutor` for SQLite to leverage automatic parametrization and compilation logic.
+*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, and `MySqlExecutor` for MySQL to leverage automatic parametrization and compilation logic.
 *   **SQLite Version Note**: SQLite is provided via Python's `sqlite3` module (version depends on Python build; check `sqlite3.sqlite_version`).
 
 ### Testing Workflow

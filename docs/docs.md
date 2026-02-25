@@ -9,18 +9,19 @@
 5. [AST Model Reference](#ast-model-reference)
 6. [PostgreSQL Compiler](#postgresql-compiler)
 7. [SQLite Compiler](#sqlite-compiler)
-8. [Execution Layer](#execution-layer)
-9. [Traversal Patterns](#traversal-patterns)
-10. [Usage Examples](#usage-examples)
-11. [Advanced Topics](#advanced-topics)
-12. [Testing](#testing)
-13. [Troubleshooting](#troubleshooting)
+8. [MySQL Compiler](#mysql-compiler)
+9. [Execution Layer](#execution-layer)
+10. [Traversal Patterns](#traversal-patterns)
+11. [Usage Examples](#usage-examples)
+12. [Advanced Topics](#advanced-topics)
+13. [Testing](#testing)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Introduction
 
-**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL and SQLite.
+**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, and MySQL.
 
 ### Design Philosophy
 
@@ -28,6 +29,11 @@
 - **Separation of Concerns**: Clean separation between AST modeling, compilation, and execution.
 - **Extensibility**: Leverages the Visitor pattern to allow custom transformations and analyses.
 - **Security**: Automatic parameterization to prevent SQL injection attacks.
+
+### Dialect Notes
+
+- **MySQL**: `INTERSECT`, `EXCEPT`, and `DROP TABLE ... CASCADE` are not supported by the compiler (raises `ValueError`).
+- **SQLite**: `DROP TABLE ... CASCADE` is not supported by the compiler (raises `ValueError`).
 
 ### Key Use Cases
 
@@ -47,9 +53,9 @@ User Code
     ↓
 Abstract Syntax Tree (AST) Layer
     ↓
-Compiler Layer (PostgreSQL / SQLite)
+Compiler Layer (PostgreSQL / SQLite / MySQL)
     ↓
-Execution Layer (psycopg / sqlite3)
+Execution Layer (psycopg / mysql-connector-python / sqlite3)
     ↓
 PostgreSQL Database / SQLite Database
 ```
@@ -70,6 +76,7 @@ Converts AST representations into executable SQL strings with parameterized valu
 
 - **PostgresCompiler**: Implements PostgreSQL-specific SQL generation
 - **SqliteCompiler**: Implements SQLite-specific SQL generation
+- **MySqlCompiler**: Implements MySQL-specific SQL generation
 - **Visitor Pattern**: Uses the visitor pattern to traverse the AST
 - **Parameterization**: Extracts values into a params list for safe execution
 
@@ -79,6 +86,7 @@ Handles database connections and query execution.
 
 - **PostgresExecutor**: Manages PostgreSQL connections via psycopg
 - **SqliteExecutor**: Manages SQLite database files via the standard library `sqlite3` module
+- **MySqlExecutor**: Manages MySQL connections via mysql-connector-python
 - **Connection Management**: Supports both connection strings and existing connections
 - **Methods**: `execute()`, `fetch_all()`, `fetch_one()`, `execute_raw()`
 
@@ -174,6 +182,8 @@ DB_PASSWORD=yourpassword
 ```
 
 For SQLite, no external database server is required. You only need a writable file path (e.g., `static/test-sqlite/db.sqlite`).
+
+For MySQL, ensure you have a running database and a connection URL (for example: `mysql://user:password@host:3306/dbname`).
 
 ### First Query
 
@@ -503,7 +513,7 @@ TopClauseNode(
 )
 ```
 
-Note: In both PostgreSQL and SQLite compilers, `TOP` is translated into `LIMIT` (and may inject an `ORDER BY` if needed).
+Note: In the PostgreSQL, SQLite, and MySQL compilers, `TOP` is translated into `LIMIT` (and may inject an `ORDER BY` if needed).
 
 #### `CTENode`
 
@@ -828,6 +838,59 @@ print(compiled.params) # [18]
 
 ---
 
+## MySQL Compiler
+
+The MySQL compiler converts AST nodes into executable MySQL query strings.
+
+### How It Works
+
+1. **Initialization**: Create a `MySqlCompiler` instance
+2. **Compilation**: Call `compile(ast_node)` to process the entire tree
+3. **Output**: Receive a `CompiledQuery` with SQL string and parameters
+
+### CompiledQuery
+
+```python
+@dataclass
+class CompiledQuery:
+    sql: str                    # The MySQL query string with %s placeholders
+    params: list[Any]          # List of values to be substituted
+```
+
+### Example
+
+```python
+from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode, ColumnNode, TableNode, WhereClauseNode,
+    BinaryOperationNode, LiteralNode
+)
+
+compiler = MySqlCompiler()
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id"), ColumnNode(name="name")],
+    from_table=TableNode(name="users"),
+    where_clause=WhereClauseNode(
+        condition=BinaryOperationNode(
+            left=ColumnNode(name="age"),
+            operator=">",
+            right=LiteralNode(value=18)
+        )
+    )
+)
+
+compiled = compiler.compile(query)
+print(compiled.sql)    # SELECT id, name FROM users WHERE age > %s
+print(compiled.params) # [18]
+```
+
+### MySQL Notes
+
+- Uses `%s` placeholders.
+- `INTERSECT` and `EXCEPT` are not supported and raise `ValueError`.
+- `DROP TABLE ... CASCADE` is not supported and raises `ValueError`.
+
 ## Execution Layer
 
 The execution layer handles database connections and query execution via psycopg (PostgreSQL) or sqlite3 (SQLite).
@@ -977,6 +1040,43 @@ The `SqliteExecutor` interface mirrors `PostgresExecutor`:
 - **Connection String Mode**: Uses the provided database file path to open a connection per call.
 - **Existing Connection Mode**: Reuses the provided connection.
 
+### MySqlExecutor
+
+#### Initialization
+
+```python
+from buildaquery.execution.mysql import MySqlExecutor
+
+# Method 1: Connection URL
+executor = MySqlExecutor(connection_info="mysql://user:password@localhost:3306/dbname")
+
+# Method 2: Existing mysql-connector connection
+import mysql.connector
+conn = mysql.connector.connect(user="user", password="password", host="localhost", database="dbname")
+executor = MySqlExecutor(connection=conn)
+
+# With custom compiler
+from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
+executor = MySqlExecutor(
+    connection_info="mysql://user:password@localhost:3306/dbname",
+    compiler=MySqlCompiler()
+)
+```
+
+#### Methods
+
+The `MySqlExecutor` interface mirrors `PostgresExecutor`:
+
+- `execute(query: CompiledQuery | ASTNode) -> Any`
+- `fetch_all(query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]`
+- `fetch_one(query: CompiledQuery | ASTNode) -> Sequence[Any] | None`
+- `execute_raw(sql: str, params: Sequence[Any] | None = None) -> None`
+
+#### Connection Management
+
+- **Connection String Mode**: Uses a MySQL URL to open a connection per call.
+- **Existing Connection Mode**: Reuses the provided connection.
+
 ---
 
 ## Traversal Patterns
@@ -1054,7 +1154,7 @@ new_query = renamer.visit(query)
 
 ## Usage Examples
 
-All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite by changing the executor import and using a SQLite database path. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
+All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite or `MySqlExecutor` for MySQL by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
 
 ### Example 1: Simple SELECT
 
@@ -1601,6 +1701,17 @@ docker-compose exec postgres psql -U postgres -c "SELECT 1"
 .\scripts\create_sqlite_db.ps1
 ```
 
+#### 7. MySQL Driver Missing
+
+**Problem**: `No module named 'mysql'` when running MySQL integration tests.
+
+**Solution**: Install the driver:
+```bash
+poetry add mysql-connector-python
+# or
+pip install mysql-connector-python
+```
+
 ### Getting Help
 
 - Check the [README.md](../README.md) for quick start guide
@@ -1622,12 +1733,16 @@ buildaquery/
 │   ├── postgres/
 │   │   ├── postgres_compiler.py
 │   │   └── README.md
+│   ├── mysql/
+│   │   ├── mysql_compiler.py
+│   │   └── README.md
 │   ├── sqlite/
 │   │   ├── sqlite_compiler.py
 │   │   └── README.md
 │   └── README.md
 ├── execution/                # Database execution layer
 │   ├── base.py
+│   ├── mysql.py
 │   ├── postgres.py
 │   ├── sqlite.py
 │   └── README.md
@@ -1637,8 +1752,10 @@ buildaquery/
 ├── tests/                    # Unit tests
 │   ├── test_ast.py
 │   ├── test_compiler_postgres.py
+│   ├── test_compiler_mysql.py
 │   ├── test_compiler_sqlite.py
 │   ├── test_execution.py
+│   ├── test_execution_mysql.py
 │   └── test_traversal.py
 ├── __init__.py
 └── __pycache__/
@@ -1648,7 +1765,9 @@ docs/                         # Documentation
 └── ...
 
 examples/                     # Example scripts
-├── sample_query.py
+├── sample_mysql.py
+├── sample_postgres.py
+├── sample_sqlite.py
 └── .env
 
 tests/                        # Integration tests

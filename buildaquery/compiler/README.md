@@ -45,11 +45,21 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQLite does not support `DROP TABLE ... CASCADE`.
 
+### MySQL (`MySqlCompiler`)
+
+#### Key Features:
+- **`%s` Placeholders**: Uses MySQL-compatible parameter style.
+- **Core AST Coverage**: Supports the same AST nodes as PostgreSQL where MySQL syntax allows.
+- **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
+- **Set Operation Limits**: Raises a `ValueError` for `INTERSECT` and `EXCEPT` (unsupported in MySQL).
+- **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because MySQL does not support `DROP TABLE ... CASCADE`.
+
 ## Usage Example
 
 ```python
 from buildaquery.compiler.postgres.postgres_compiler import PostgresCompiler
 from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
+from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -60,5 +70,10 @@ print(compiled.params) # [123]
 sqlite_compiler = SqliteCompiler()
 compiled = sqlite_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
+print(compiled.params) # [123]
+
+mysql_compiler = MySqlCompiler()
+compiled = mysql_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 ```

@@ -4,6 +4,8 @@ The SQLite compiler translates the AST into SQLite-compatible SQL.
 
 **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 
+**Dialect Notes**: This compiler targets SQLite. See the PostgreSQL and MySQL compiler READMEs for their dialect-specific notes.
+
 ## Notes
 
 - Uses `?` placeholders for parametrized values.

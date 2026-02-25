@@ -2,7 +2,7 @@
 
 This sub-module provides the concrete implementation of the SQL compiler for PostgreSQL.
 
-**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+**Dialect Notes**: This compiler targets PostgreSQL. See the SQLite and MySQL compiler READMEs for dialect-specific notes.
 
 
 ## Features

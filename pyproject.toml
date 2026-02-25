@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "buildaquery"
-version = "0.2.0"
-description = "A Python-based query builder for PostgreSQL."
+version = "0.3.0"
+description = "A Python-based query builder for PostgreSQL, SQLite, and MySQL."
 authors = ["Anirudh Bhattacharya <anirudhbhattacharya1@gmail.com>"]
 readme = "README.md"
 packages = [{include = "buildaquery"}]
@@ -21,6 +21,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.12"
 psycopg = "3.3.3"
+mysql-connector-python = "9.4.0"
 colorama = "0.4.6"
 packaging = "26.0"
 pluggy = "1.6.0"

@@ -20,6 +20,9 @@ A concrete implementation for SQLite using Python's standard library `sqlite3` m
 
 **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 
+### `MySqlExecutor`
+A concrete implementation for MySQL using `mysql-connector-python`.
+
 ## Usage Example
 
 ```python
@@ -45,4 +48,5 @@ for row in rows:
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
- - `SqliteExecutor` uses the standard library `sqlite3` module (no external dependency).
+- `SqliteExecutor` uses the standard library `sqlite3` module (no external dependency).
+- `MySqlExecutor` requires `mysql-connector-python` (`pip install mysql-connector-python`).

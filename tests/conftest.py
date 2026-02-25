@@ -2,13 +2,16 @@ import os
 import time
 import pytest
 import psycopg
+from urllib.parse import urlparse, unquote
 from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.execution.sqlite import SqliteExecutor
+from buildaquery.execution.mysql import MySqlExecutor
 
 # Use Docker credentials by default, but allow override via environment variable
 # Use 127.0.0.1 to avoid potential IPv6 resolution issues on some systems
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@127.0.0.1:5433/buildaquery_test")
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", os.path.join("static", "test-sqlite", "db.sqlite"))
+MYSQL_DATABASE_URL = os.getenv("MYSQL_DATABASE_URL", "mysql://root:password@127.0.0.1:3307/buildaquery_test")
 
 @pytest.fixture(scope="session")
 def db_connection():
@@ -82,6 +85,75 @@ def sqlite_connection():
         yield conn
     finally:
         conn.close()
+
+def _parse_mysql_url(url: str) -> dict[str, str | int | None]:
+    parsed = urlparse(url)
+    if parsed.scheme != "mysql":
+        raise ValueError("MySQL connection string must start with mysql://")
+
+    return {
+        "user": unquote(parsed.username) if parsed.username else None,
+        "password": unquote(parsed.password) if parsed.password else None,
+        "host": parsed.hostname or "127.0.0.1",
+        "port": parsed.port or 3306,
+        "database": parsed.path.lstrip("/") if parsed.path else None
+    }
+
+@pytest.fixture(scope="session")
+def mysql_connection():
+    """
+    Yields a connection to the MySQL test database.
+    Retries for up to 10 seconds to allow the container to start.
+    """
+    retries = 30
+    last_error: Exception | None = None
+    while retries > 0:
+        try:
+            import mysql.connector
+            conn = mysql.connector.connect(
+                **_parse_mysql_url(MYSQL_DATABASE_URL),
+                auth_plugin="mysql_native_password",
+                connection_timeout=3
+            )
+            conn.autocommit = True
+            conn.ping(reconnect=True, attempts=3, delay=1)
+            yield conn
+            conn.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+
+    error_details = f" Last error: {last_error}" if last_error else ""
+    pytest.fail(
+        f"Could not connect to MySQL test database at {MYSQL_DATABASE_URL} after 30 seconds. Is Docker running?{error_details}"
+    )
+
+@pytest.fixture(scope="function")
+def mysql_executor(mysql_connection):
+    """
+    Yields a MySqlExecutor instance for running queries.
+    """
+    executor = MySqlExecutor(connection=mysql_connection)
+    yield executor
+
+@pytest.fixture(scope="function")
+def mysql_create_table(mysql_executor):
+    """
+    A fixture that creates a table and ensures it is dropped after the test.
+    """
+    created_tables = []
+
+    def _create(create_node):
+        mysql_executor.execute(create_node)
+        created_tables.append(create_node.table.name)
+        return create_node.table.name
+
+    yield _create
+
+    for table_name in reversed(created_tables):
+        mysql_executor.execute_raw(f"DROP TABLE IF EXISTS {table_name}")
 
 @pytest.fixture(scope="function")
 def sqlite_executor(sqlite_connection):
