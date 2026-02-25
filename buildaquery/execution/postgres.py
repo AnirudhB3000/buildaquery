@@ -1,5 +1,6 @@
 from typing import Any, Sequence, cast
-from buildaquery.compiler.postgres.postgres_compiler import CompiledQuery, PostgresCompiler
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.compiler.postgres.postgres_compiler import PostgresCompiler
 from buildaquery.execution.base import Executor
 from buildaquery.abstract_syntax_tree.models import ASTNode
 

@@ -3,3 +3,4 @@ GEMINI.md
 **/__pycache__/
 **/.env
 dist/
+static/test-sqlite/db.sqlite

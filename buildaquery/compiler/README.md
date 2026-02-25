@@ -35,14 +35,30 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Automatically translates `TopClauseNode` into PostgreSQL-compliant `LIMIT` and `ORDER BY` logic.
 - **Mutual Exclusivity Enforcement**: Raises a `ValueError` if a query attempts to use both `TOP` and standard `LIMIT/OFFSET`.
 
+### SQLite (`SqliteCompiler`)
+
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+
+#### Key Features:
+- **`?` Placeholders**: Uses SQLite's parameter style.
+- **Core AST Coverage**: Supports the same AST nodes as PostgreSQL where SQLite syntax allows.
+- **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
+- **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQLite does not support `DROP TABLE ... CASCADE`.
+
 ## Usage Example
 
 ```python
 from buildaquery.compiler.postgres.postgres_compiler import PostgresCompiler
+from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
 
 print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.params) # [123]
+
+sqlite_compiler = SqliteCompiler()
+compiled = sqlite_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
 print(compiled.params) # [123]
 ```

@@ -8,18 +8,19 @@
 4. [Getting Started](#getting-started)
 5. [AST Model Reference](#ast-model-reference)
 6. [PostgreSQL Compiler](#postgresql-compiler)
-7. [Execution Layer](#execution-layer)
-8. [Traversal Patterns](#traversal-patterns)
-9. [Usage Examples](#usage-examples)
-10. [Advanced Topics](#advanced-topics)
-11. [Testing](#testing)
-12. [Troubleshooting](#troubleshooting)
+7. [SQLite Compiler](#sqlite-compiler)
+8. [Execution Layer](#execution-layer)
+9. [Traversal Patterns](#traversal-patterns)
+10. [Usage Examples](#usage-examples)
+11. [Advanced Topics](#advanced-topics)
+12. [Testing](#testing)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Introduction
 
-**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library currently supports PostgreSQL with extensibility for future database systems.
+**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL and SQLite.
 
 ### Design Philosophy
 
@@ -46,11 +47,11 @@ User Code
     ↓
 Abstract Syntax Tree (AST) Layer
     ↓
-Compiler Layer (PostgreSQL)
+Compiler Layer (PostgreSQL / SQLite)
     ↓
-Execution Layer (psycopg)
+Execution Layer (psycopg / sqlite3)
     ↓
-PostgreSQL Database
+PostgreSQL Database / SQLite Database
 ```
 
 ### Layer Breakdown
@@ -61,13 +62,14 @@ Defines the data structures representing SQL queries. Each SQL construct (SELECT
 
 - **Nodes**: Inherit from `ASTNode` base class
 - **Types**: Expression nodes, statement nodes, clause nodes
-- **Immutability**: Dataclasses are frozen by default for safety
+- **Dataclasses**: Nodes are plain dataclasses, optimized for clarity and type safety
 
 #### 2. **Compiler Layer** (`buildaquery/compiler/`)
 
 Converts AST representations into executable SQL strings with parameterized values.
 
 - **PostgresCompiler**: Implements PostgreSQL-specific SQL generation
+- **SqliteCompiler**: Implements SQLite-specific SQL generation
 - **Visitor Pattern**: Uses the visitor pattern to traverse the AST
 - **Parameterization**: Extracts values into a params list for safe execution
 
@@ -76,6 +78,7 @@ Converts AST representations into executable SQL strings with parameterized valu
 Handles database connections and query execution.
 
 - **PostgresExecutor**: Manages PostgreSQL connections via psycopg
+- **SqliteExecutor**: Manages SQLite database files via the standard library `sqlite3` module
 - **Connection Management**: Supports both connection strings and existing connections
 - **Methods**: `execute()`, `fetch_all()`, `fetch_one()`, `execute_raw()`
 
@@ -131,7 +134,8 @@ All user-provided values are extracted into a separate `params` list, preventing
 "SELECT * FROM users WHERE name = 'Robert'; DROP TABLE users;--"
 
 # Build-a-Query produces:
-sql = "SELECT * FROM users WHERE name = %s"
+sql = "SELECT * FROM users WHERE name = %s"  # PostgreSQL
+sql = "SELECT * FROM users WHERE name = ?"   # SQLite
 params = ["Robert'; DROP TABLE users;--"]
 ```
 
@@ -158,7 +162,7 @@ pip install buildaquery
 
 ### Prerequisites
 
-Ensure you have a running PostgreSQL database and the required environment variables set:
+For PostgreSQL, ensure you have a running database and the required environment variables set:
 
 ```bash
 # .env file
@@ -168,6 +172,8 @@ DB_NAME=mydatabase
 DB_USER=postgres
 DB_PASSWORD=yourpassword
 ```
+
+For SQLite, no external database server is required. You only need a writable file path (e.g., `static/test-sqlite/db.sqlite`).
 
 ### First Query
 
@@ -201,6 +207,27 @@ query = SelectStatementNode(
 results = executor.execute(query)
 print(results)
 ```
+
+### SQLite Quick Start
+
+```python
+from buildaquery.execution.sqlite import SqliteExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode, ColumnNode, TableNode, StarNode
+)
+
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+
+query = SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=TableNode(name="users")
+)
+
+results = executor.execute(query)
+print(results)
+```
+
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 
 ---
 
@@ -340,6 +367,17 @@ FunctionCallNode(
 )
 ```
 
+#### `OverClauseNode`
+
+Represents the `OVER (...)` clause for window functions.
+
+```python
+OverClauseNode(
+    partition_by=[ColumnNode(name="dept")],
+    order_by=[OrderByClauseNode(expression=ColumnNode(name="salary"), direction="DESC")]
+)
+```
+
 #### `CastNode`
 
 Represents type casting.
@@ -392,8 +430,8 @@ Represents `BETWEEN` expressions.
 # age BETWEEN 18 AND 65
 BetweenNode(
     expression=ColumnNode(name="age"),
-    lower=LiteralNode(value=18),
-    upper=LiteralNode(value=65),
+    low=LiteralNode(value=18),
+    high=LiteralNode(value=65),
     negated=False
 )
 ```
@@ -405,7 +443,7 @@ Represents `CASE` expressions.
 ```python
 # CASE WHEN age < 18 THEN 'minor' WHEN age >= 18 THEN 'adult' END
 CaseExpressionNode(
-    when_then_clauses=[
+    cases=[
         WhenThenNode(
             condition=BinaryOperationNode(...),
             result=LiteralNode(value="minor")
@@ -415,7 +453,7 @@ CaseExpressionNode(
             result=LiteralNode(value="adult")
         )
     ],
-    else_clause=LiteralNode(value="unknown")
+    else_result=LiteralNode(value="unknown")
 )
 ```
 
@@ -450,6 +488,31 @@ SelectStatementNode(
     top_clause=None,
     limit=None,
     offset=None
+)
+```
+
+#### `TopClauseNode`
+
+Represents a `TOP` clause for dialects that support it. It is mutually exclusive with `LIMIT` and `OFFSET`.
+
+```python
+TopClauseNode(
+    count=10,
+    on_expression=ColumnNode(name="score"),
+    direction="DESC"
+)
+```
+
+Note: In both PostgreSQL and SQLite compilers, `TOP` is translated into `LIMIT` (and may inject an `ORDER BY` if needed).
+
+#### `CTENode`
+
+Represents a Common Table Expression used in a `WITH` clause.
+
+```python
+CTENode(
+    name="recent_users",
+    subquery=SelectStatementNode(...)
 )
 ```
 
@@ -527,6 +590,20 @@ CreateStatementNode(
 )
 ```
 
+#### `ColumnDefinitionNode`
+
+Represents a column definition used in `CREATE TABLE`.
+
+```python
+ColumnDefinitionNode(
+    name="id",
+    data_type="INTEGER",
+    primary_key=True,
+    not_null=True,
+    default=LiteralNode(value=1)
+)
+```
+
 #### `DropStatementNode`
 
 Represents a DROP TABLE statement.
@@ -538,6 +615,8 @@ DropStatementNode(
     cascade=True  # DROP TABLE ... CASCADE
 )
 ```
+
+Note: SQLite does not support `DROP TABLE ... CASCADE`. The SQLite compiler raises `ValueError` when `cascade=True`.
 
 ### Clause Nodes
 
@@ -567,6 +646,8 @@ JoinClauseNode(
     join_type="INNER"  # INNER, LEFT, RIGHT, FULL OUTER, CROSS
 )
 ```
+
+Note: SQLite does not support `RIGHT` or `FULL OUTER` joins.
 
 #### `OrderByClauseNode`
 
@@ -627,6 +708,8 @@ class CompiledQuery:
     params: list[Any]          # List of values to be substituted
 ```
 
+**Note**: `CompiledQuery` is shared across dialects and lives in `buildaquery/compiler/compiled_query.py`.
+
 ### Example
 
 ```python
@@ -685,9 +768,69 @@ class CustomCompiler(PostgresCompiler):
 
 ---
 
+## SQLite Compiler
+
+The SQLite compiler converts AST nodes into executable SQLite query strings.
+
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+
+### How It Works
+
+The compiler uses the Visitor pattern to traverse the AST and generate SQL:
+
+1. **Initialization**: Create a `SqliteCompiler` instance
+2. **Compilation**: Call `compile(ast_node)` to process the entire tree
+3. **Output**: Receive a `CompiledQuery` with SQL string and parameters
+
+### CompiledQuery
+
+```python
+@dataclass
+class CompiledQuery:
+    sql: str                    # The SQLite query string with ? placeholders
+    params: list[Any]          # List of values to be substituted
+```
+
+### Example
+
+```python
+from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode, ColumnNode, TableNode, WhereClauseNode,
+    BinaryOperationNode, LiteralNode
+)
+
+compiler = SqliteCompiler()
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id"), ColumnNode(name="name")],
+    from_table=TableNode(name="users"),
+    where_clause=WhereClauseNode(
+        condition=BinaryOperationNode(
+            left=ColumnNode(name="age"),
+            operator=">",
+            right=LiteralNode(value=18)
+        )
+    )
+)
+
+compiled = compiler.compile(query)
+print(compiled.sql)    # SELECT id, name FROM users WHERE age > ?
+print(compiled.params) # [18]
+```
+
+### SQLite Notes
+
+- Uses `?` placeholders.
+- `TOP` is translated to `LIMIT`.
+- `DROP TABLE ... CASCADE` is not supported and raises `ValueError`.
+- Window functions require SQLite 3.25+.
+
+---
+
 ## Execution Layer
 
-The execution layer handles database connections and query execution via psycopg.
+The execution layer handles database connections and query execution via psycopg (PostgreSQL) or sqlite3 (SQLite).
 
 ### PostgresExecutor
 
@@ -765,6 +908,14 @@ executor.execute_raw(
 )
 ```
 
+For SQLite, use `?` placeholders:
+```python
+executor.execute_raw(
+    "INSERT INTO users (name, age) VALUES (?, ?)",
+    ["Charlie", 35]
+)
+```
+
 #### Connection Management
 
 The executor handles connections automatically:
@@ -786,6 +937,45 @@ with psycopg.connect("postgresql://...") as conn:
     
 # Connection automatically closed
 ```
+
+### SqliteExecutor
+
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+
+#### Initialization
+
+```python
+from buildaquery.execution.sqlite import SqliteExecutor
+
+# Method 1: Database file path
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+
+# Method 2: Existing sqlite3 connection
+import sqlite3
+conn = sqlite3.connect("static/test-sqlite/db.sqlite")
+executor = SqliteExecutor(connection=conn)
+
+# With custom compiler
+from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
+executor = SqliteExecutor(
+    connection_info="static/test-sqlite/db.sqlite",
+    compiler=SqliteCompiler()
+)
+```
+
+#### Methods
+
+The `SqliteExecutor` interface mirrors `PostgresExecutor`:
+
+- `execute(query: CompiledQuery | ASTNode) -> Any`
+- `fetch_all(query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]`
+- `fetch_one(query: CompiledQuery | ASTNode) -> Sequence[Any] | None`
+- `execute_raw(sql: str, params: Sequence[Any] | None = None) -> None`
+
+#### Connection Management
+
+- **Connection String Mode**: Uses the provided database file path to open a connection per call.
+- **Existing Connection Mode**: Reuses the provided connection.
 
 ---
 
@@ -863,6 +1053,8 @@ new_query = renamer.visit(query)
 ---
 
 ## Usage Examples
+
+All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite by changing the executor import and using a SQLite database path. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
 
 ### Example 1: Simple SELECT
 
@@ -1068,7 +1260,7 @@ query = SelectStatementNode(
     select_list=[
         ColumnNode(name="name"),
         CaseExpressionNode(
-            when_then_clauses=[
+            cases=[
                 WhenThenNode(
                     condition=BinaryOperationNode(
                         left=ColumnNode(name="age"),
@@ -1086,7 +1278,7 @@ query = SelectStatementNode(
                     result=LiteralNode(value="adult")
                 )
             ],
-            else_clause=LiteralNode(value="unknown")
+            else_result=LiteralNode(value="unknown")
         )
     ],
     from_table=TableNode(name="users")
@@ -1165,7 +1357,7 @@ results = executor.execute(query)
 
 ### Custom Compiler Implementation
 
-Extend the PostgreSQL compiler to support custom SQL dialects or add new nodes:
+Extend the PostgreSQL or SQLite compiler to support custom SQL dialects or add new nodes:
 
 ```python
 from buildaquery.compiler.postgres.postgres_compiler import PostgresCompiler
@@ -1183,6 +1375,8 @@ class CustomSQLCompiler(PostgresCompiler):
         # Implementation
         pass
 ```
+
+For SQLite, subclass `SqliteCompiler` instead.
 
 ### Dynamic Query Building
 
@@ -1278,6 +1472,12 @@ docker-compose up -d
 poetry run pytest tests
 ```
 
+SQLite integration tests run against the file-based database at `static/test-sqlite/db.sqlite`.
+
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+
+SQLite integration tests do not require Docker.
+
 #### All Tests
 ```bash
 poetry run all-tests
@@ -1304,6 +1504,8 @@ def test_simple_select(executor):
     results = executor.execute(query)
     assert len(results) > 0
 ```
+
+For SQLite integration tests, use the `sqlite_executor` and `sqlite_create_table` fixtures from `tests/conftest.py`.
 
 ---
 
@@ -1365,6 +1567,16 @@ print(compiled.sql)      # Review SQL
 print(compiled.params)   # Review parameters
 ```
 
+For SQLite:
+```python
+from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
+
+compiler = SqliteCompiler()
+compiled = compiler.compile(query)
+print(compiled.sql)
+print(compiled.params)
+```
+
 #### 5. Test Database Setup
 
 **Problem**: Integration tests fail to connect.
@@ -1376,6 +1588,17 @@ docker-compose up -d
 
 # Verify connection
 docker-compose exec postgres psql -U postgres -c "SELECT 1"
+```
+
+#### 6. SQLite Database File Issues
+
+**Problem**: SQLite integration tests fail due to missing or unwritable database file.
+
+**Solution**: Ensure the path is writable and create the file if needed:
+```bash
+./scripts/create_sqlite_db.sh
+# or on Windows
+.\scripts\create_sqlite_db.ps1
 ```
 
 ### Getting Help
@@ -1395,13 +1618,18 @@ buildaquery/
 │   ├── models.py
 │   └── README.md
 ├── compiler/                 # SQL compilation logic
+│   ├── compiled_query.py
 │   ├── postgres/
 │   │   ├── postgres_compiler.py
+│   │   └── README.md
+│   ├── sqlite/
+│   │   ├── sqlite_compiler.py
 │   │   └── README.md
 │   └── README.md
 ├── execution/                # Database execution layer
 │   ├── base.py
 │   ├── postgres.py
+│   ├── sqlite.py
 │   └── README.md
 ├── traversal/                # AST traversal patterns
 │   ├── visitor_pattern.py
@@ -1409,13 +1637,14 @@ buildaquery/
 ├── tests/                    # Unit tests
 │   ├── test_ast.py
 │   ├── test_compiler_postgres.py
+│   ├── test_compiler_sqlite.py
 │   ├── test_execution.py
 │   └── test_traversal.py
 ├── __init__.py
 └── __pycache__/
 
 docs/                         # Documentation
-├── COMPREHENSIVE_GUIDE.md    # This file
+├── docs.md                   # This file
 └── ...
 
 examples/                     # Example scripts
@@ -1425,10 +1654,13 @@ examples/                     # Example scripts
 tests/                        # Integration tests
 ├── conftest.py
 ├── test_postgres_integration.py
+├── test_sqlite_integration.py
 └── README.md
 
 scripts/                      # Utility scripts
 ├── __init__.py
+├── create_sqlite_db.ps1
+├── create_sqlite_db.sh
 └── ...
 
 pyproject.toml               # Project metadata and dependencies

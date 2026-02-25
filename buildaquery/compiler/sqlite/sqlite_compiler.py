@@ -1,6 +1,5 @@
 from typing import Any
 
-from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.abstract_syntax_tree.models import (
     ASTNode,
     SelectStatementNode,
@@ -36,15 +35,16 @@ from buildaquery.abstract_syntax_tree.models import (
     CTENode,
     OverClauseNode
 )
+from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.traversal.visitor_pattern import Visitor
 
 # ==================================================
-# PostgreSQL Compiler
+# SQLite Compiler
 # ==================================================
 
-class PostgresCompiler(Visitor):
+class SqliteCompiler(Visitor):
     """
-    A visitor that compiles an AST into a PostgreSQL query string and a list of parameters.
+    A visitor that compiles an AST into a SQLite query string and a list of parameters.
     """
 
     def __init__(self) -> None:
@@ -54,7 +54,7 @@ class PostgresCompiler(Visitor):
         """
         The main entry point for compiling an AST node.
         """
-        self._params = [] # Reset params for each compilation
+        self._params = []
         sql = self.visit(node)
         return CompiledQuery(sql=sql, params=self._params)
 
@@ -66,13 +66,11 @@ class PostgresCompiler(Visitor):
         """
         Compiles a SELECT statement, ensuring clauses are in the correct order.
         """
-        # Mutual Exclusivity Check: TOP vs LIMIT/OFFSET
         if node.top_clause and (node.limit is not None or node.offset is not None):
             raise ValueError("TOP clause is mutually exclusive with LIMIT and OFFSET.")
 
         parts: list[str] = []
 
-        # 0. CTEs (WITH Clause)
         if node.ctes:
             cte_sqls = [self.visit(cte) for cte in node.ctes]
             parts.append(f"WITH {', '.join(cte_sqls)}")
@@ -82,34 +80,27 @@ class PostgresCompiler(Visitor):
         if node.distinct:
             parts.append("DISTINCT")
 
-        # 1. Select List
         select_list_sql = ", ".join([self.visit(item) for item in node.select_list])
         parts.append(select_list_sql)
 
-        # 2. FROM Clause
         if node.from_table:
             parts.append("FROM")
             parts.append(self.visit(node.from_table))
 
-        # 3. WHERE Clause
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
 
-        # 4. GROUP BY Clause
         if node.group_by:
             parts.append(self.visit(node.group_by))
 
-        # 5. HAVING Clause
         if node.having_clause:
             parts.append(self.visit(node.having_clause))
 
-        # 6. ORDER BY Clause
         order_by_sql = ""
         if node.order_by_clause:
             order_by_items = [self.visit(item) for item in node.order_by_clause]
             order_by_sql = f"ORDER BY {', '.join(order_by_items)}"
-        
-        # Apply implicit TOP ordering if no explicit ORDER BY is present
+
         if node.top_clause and node.top_clause.on_expression and not order_by_sql:
             top_order = f"{self.visit(node.top_clause.on_expression)} {node.top_clause.direction}"
             order_by_sql = f"ORDER BY {top_order}"
@@ -117,14 +108,12 @@ class PostgresCompiler(Visitor):
         if order_by_sql:
             parts.append(order_by_sql)
 
-        # 7. LIMIT / OFFSET (Standard or from TOP translation)
         if node.limit is not None:
             parts.append(f"LIMIT {node.limit}")
         if node.offset is not None:
             parts.append(f"OFFSET {node.offset}")
-        
+
         if node.top_clause:
-            # PostgreSQL translates TOP to LIMIT
             parts.append(f"LIMIT {node.top_clause.count}")
 
         return " ".join(parts)
@@ -152,7 +141,7 @@ class PostgresCompiler(Visitor):
         cols = ""
         if node.columns:
             cols = f" ({', '.join([c.name for c in node.columns])})"
-        
+
         vals = ", ".join([self.visit(v) for v in node.values])
         return f"INSERT INTO {table}{cols} VALUES ({vals})"
 
@@ -162,11 +151,11 @@ class PostgresCompiler(Visitor):
         """
         table = self.visit(node.table)
         sets = ", ".join([f"{col} = {self.visit(expr)}" for col, expr in node.set_clauses.items()])
-        
+
         parts = [f"UPDATE {table} SET {sets}"]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
-        
+
         return " ".join(parts)
 
     def visit_CreateStatementNode(self, node: CreateStatementNode) -> str:
@@ -195,31 +184,32 @@ class PostgresCompiler(Visitor):
         """
         Compiles a DROP TABLE statement.
         """
+        if node.cascade:
+            raise ValueError("SQLite does not support CASCADE in DROP TABLE.")
         if_exists = " IF EXISTS" if node.if_exists else ""
         table = self.visit(node.table)
-        cascade = " CASCADE" if node.cascade else ""
-        return f"DROP TABLE{if_exists} {table}{cascade}"
+        return f"DROP TABLE{if_exists} {table}"
 
     def visit_UnionNode(self, node: UnionNode) -> str:
         """
         Compiles a UNION operation.
         """
         op = "UNION ALL" if node.all else "UNION"
-        return f"({self.visit(node.left)} {op} {self.visit(node.right)})"
+        return f"{self.visit(node.left)} {op} {self.visit(node.right)}"
 
     def visit_IntersectNode(self, node: IntersectNode) -> str:
         """
         Compiles an INTERSECT operation.
         """
         op = "INTERSECT ALL" if node.all else "INTERSECT"
-        return f"({self.visit(node.left)} {op} {self.visit(node.right)})"
+        return f"{self.visit(node.left)} {op} {self.visit(node.right)}"
 
     def visit_ExceptNode(self, node: ExceptNode) -> str:
         """
         Compiles an EXCEPT operation.
         """
         op = "EXCEPT ALL" if node.all else "EXCEPT"
-        return f"({self.visit(node.left)} {op} {self.visit(node.right)})"
+        return f"{self.visit(node.left)} {op} {self.visit(node.right)}"
 
     # --------------------------------------------------
     # Expression Nodes
@@ -235,7 +225,7 @@ class PostgresCompiler(Visitor):
         Parametrizes the literal value to prevent SQL injection.
         """
         self._params.append(node.value)
-        return "%s"
+        return "?"
 
     def visit_BinaryOperationNode(self, node: BinaryOperationNode) -> str:
         left = self.visit(node.left)
@@ -266,11 +256,11 @@ class PostgresCompiler(Visitor):
         if node.partition_by:
             exprs = ", ".join([self.visit(expr) for expr in node.partition_by])
             parts.append(f"PARTITION BY {exprs}")
-        
+
         if node.order_by:
             exprs = ", ".join([self.visit(item) for item in node.order_by])
             parts.append(f"ORDER BY {exprs}")
-        
+
         return f"({' '.join(parts)})"
 
     def visit_UnaryOperationNode(self, node: UnaryOperationNode) -> str:

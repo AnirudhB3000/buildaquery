@@ -15,11 +15,16 @@ An abstract base class that defines the interface for all database executors.
 ### `PostgresExecutor`
 A concrete implementation for PostgreSQL using the `psycopg` library. It handles connection management and query parametrization automatically.
 
+### `SqliteExecutor`
+A concrete implementation for SQLite using Python's standard library `sqlite3` module.
+
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+
 ## Usage Example
 
 ```python
 from buildaquery.execution.postgres import PostgresExecutor
-from buildaquery.compiler.postgres.postgres_compiler import CompiledQuery
+from buildaquery.compiler.compiled_query import CompiledQuery
 
 # 1. Prepare the query (usually from a compiler)
 compiled = CompiledQuery(
@@ -40,3 +45,4 @@ for row in rows:
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
+ - `SqliteExecutor` uses the standard library `sqlite3` module (no external dependency).

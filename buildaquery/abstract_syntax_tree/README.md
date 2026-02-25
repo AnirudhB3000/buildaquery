@@ -2,6 +2,8 @@
 
 The `abstract_syntax_tree` module defines the data structures used to represent SQL queries as an Abstract Syntax Tree. This representation is agnostic of any specific SQL dialect and serves as the intermediate format that the query builder constructs and the compiler translates into SQL.
 
+**SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
+
 ## Core Concepts
 
 The AST is built using a hierarchy of nodes, all inheriting from the base `ASTNode` class.

@@ -1,6 +1,6 @@
 # Build-a-Query
 
-A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Initial support is focused on PostgreSQL.
+A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL and SQLite.
 
 ## Features
 
@@ -11,7 +11,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
-- **Execution Layer**: Built-in support for executing compiled queries via `psycopg`.
+- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL) and the standard library `sqlite3` (SQLite).
 
 ## Installation
 
@@ -29,6 +29,8 @@ pip install buildaquery
   - Example with Docker: `docker run --name postgres -e POSTGRES_PASSWORD=yourpassword -d -p 5432:5432 postgres:15`
 - `psycopg` (automatically installed as a dependency) - the PostgreSQL adapter for Python.
 - `python-dotenv` (automatically installed as a dependency) - for loading environment variables from a `.env` file.
+- **SQLite**: Uses Python's standard library `sqlite3` module.
+  - **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 
 ### Environment Variables
 
@@ -134,6 +136,46 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True)
 executor.execute(drop_stmt)
 ```
 
+### SQLite Quick Start
+
+```python
+from buildaquery.execution.sqlite import SqliteExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    CreateStatementNode, TableNode, ColumnDefinitionNode,
+    InsertStatementNode, ColumnNode, LiteralNode,
+    SelectStatementNode, StarNode, DropStatementNode
+)
+
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+
+users_table = TableNode(name="users")
+create_stmt = CreateStatementNode(
+    table=users_table,
+    columns=[
+        ColumnDefinitionNode(name="id", data_type="INTEGER", primary_key=True),
+        ColumnDefinitionNode(name="name", data_type="TEXT", not_null=True),
+        ColumnDefinitionNode(name="age", data_type="INTEGER")
+    ]
+)
+executor.execute(create_stmt)
+
+insert_stmt = InsertStatementNode(
+    table=users_table,
+    columns=[ColumnNode(name="name"), ColumnNode(name="age")],
+    values=[LiteralNode(value="Alice"), LiteralNode(value=30)]
+)
+executor.execute(insert_stmt)
+
+select_stmt = SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=users_table
+)
+print(executor.execute(select_stmt))
+
+drop_stmt = DropStatementNode(table=users_table, if_exists=True)
+executor.execute(drop_stmt)
+```
+
 For more examples, see the `examples/` directory.
 
 ## Development Setup
@@ -186,6 +228,8 @@ Then run integration tests:
 poetry run pytest tests
 ```
 
+SQLite integration tests use the file-based database at `static/test-sqlite/db.sqlite`.
+
 #### All Tests
 
 Run all tests (unit and integration):
@@ -206,7 +250,7 @@ poetry run python examples/sample_query.py
 
 - `buildaquery/abstract_syntax_tree/`: Defines query nodes and AST models.
 - `buildaquery/traversal/`: Base classes for AST traversal (Visitor/Transformer pattern).
-- `buildaquery/compiler/`: Dialect-specific SQL generation (currently PostgreSQL).
+- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL and SQLite).
 - `buildaquery/execution/`: Database connection and execution logic.
 - `tests/`: Exhaustive unit and integration tests.
 - `examples/`: Practical demonstrations of the library.

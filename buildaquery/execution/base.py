@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Sequence
-from buildaquery.compiler.postgres.postgres_compiler import CompiledQuery
+from buildaquery.compiler.compiled_query import CompiledQuery
 
 # ==================================================
 # Base Executor

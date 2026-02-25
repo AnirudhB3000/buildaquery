@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "buildaquery"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Python-based query builder for PostgreSQL."
 authors = ["Anirudh Bhattacharya <anirudhbhattacharya1@gmail.com>"]
 readme = "README.md"
@@ -47,6 +47,7 @@ unit-tests = "scripts:run_unit_tests"
 integration-tests = "scripts:run_integration_tests"
 all-tests = "scripts:run_all_tests"
 clean = "scripts:clean_project"
+setup-tests = "scripts:setup_tests"
 
 [tool.poetry.urls]
 "Homepage" = "https://github.com/AnirudhB3000/buildaquery"

@@ -55,3 +55,23 @@ def clean_project():
             pass
     
     print("Cleanup complete.")
+
+def setup_tests():
+    """Prepare integration test dependencies (Postgres + SQLite)."""
+    print("Starting Docker services for integration tests...")
+    docker_result = subprocess.run(["docker-compose", "up", "-d"], check=False)
+    if docker_result.returncode != 0:
+        sys.exit(docker_result.returncode)
+
+    print("Preparing SQLite test database...")
+    if os.name == "nt":
+        sqlite_script = os.path.join("scripts", "create_sqlite_db.ps1")
+        result = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", sqlite_script], check=False)
+    else:
+        sqlite_script = os.path.join("scripts", "create_sqlite_db.sh")
+        result = subprocess.run(["bash", sqlite_script], check=False)
+
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    print("Test setup complete.")

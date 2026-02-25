@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from buildaquery.execution.postgres import PostgresExecutor
-from buildaquery.compiler.postgres.postgres_compiler import CompiledQuery
+from buildaquery.compiler.compiled_query import CompiledQuery
 
 @pytest.fixture
 def mock_psycopg():
