@@ -73,6 +73,7 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Implemented `MySqlExecutor` using `mysql-connector-python`.
     *   Added MySQL unit tests and integration tests using Docker (`mysql:8.0`) on port `3307`.
     *   Extended integration test fixtures to manage MySQL connections and schema lifecycle.
+    *   Added MySQL example script (`examples/sample_mysql.py`) and documentation updates across READMEs and `docs/docs.md`.
 
 ---
 
