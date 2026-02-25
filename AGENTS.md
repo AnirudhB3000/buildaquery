@@ -1,11 +1,11 @@
 # Build-a-Query Project Goals
 
-This project aims to create a query builder for Python with initial support for PostgreSQL. The development process is broken down into the following stages: 
+This project aims to create a query builder for Python with support for PostgreSQL and SQLite. The development process is broken down into the following stages: 
 
 1.  **Abstract Syntax Tree (AST):** Define and build the necessary data structures to represent queries as an AST.
 2.  **AST Traversal:** Implement mechanisms for traversing the AST to analyze, modify, and process the query structure.
-3.  **SQL Compiler:** Develop a compiler that translates the AST into a valid SQL query, with initial focus on PostgreSQL compatibility.
-4.  **Execution Layer:** Create a layer responsible for executing the compiled SQL queries against the target database.
+3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL and SQLite.
+4.  **Execution Layer:** Create layers responsible for executing the compiled SQL queries against the target databases.
 
 ---
 
@@ -61,6 +61,13 @@ This project aims to create a query builder for Python with initial support for 
         *   `integration-tests`: Runs the Docker-based database tests.
         *   `all-tests`: Executes the complete test suite.
         *   `clean`: Project-wide cleanup of `__pycache__` and test artifacts.
+*   **SQLite Support**:
+    *   Implemented `SqliteCompiler` with SQLite-compatible placeholders (`?`) and dialect notes.
+    *   Implemented `SqliteExecutor` using Python's standard library `sqlite3`.
+    *   Added SQLite unit tests and integration tests using the file-based DB at `static/test-sqlite/db.sqlite`.
+    *   Added helper scripts to create the SQLite DB: `scripts/create_sqlite_db.ps1` and `scripts/create_sqlite_db.sh`.
+    *   Added `setup-tests` Poetry script to bootstrap Postgres (Docker) and SQLite DB setup.
+    *   Introduced shared `CompiledQuery` in `buildaquery/compiler/compiled_query.py`.
 
 ---
 
@@ -74,11 +81,12 @@ This project aims to create a query builder for Python with initial support for 
 ### Architecture & Logic
 *   **AST Traversal:** Strictly adhere to the **Visitor Pattern**.
 *   **Compilation**: Favor **post-order traversal** to ensure sub-expressions resolve before parent nodes.
-*   **Execution**: Always use `PostgresExecutor` for database interactions to leverage its automatic parametrization and compilation logic.
+*   **Execution**: Use `PostgresExecutor` for PostgreSQL and `SqliteExecutor` for SQLite to leverage automatic parametrization and compilation logic.
+*   **SQLite Version Note**: SQLite is provided via Python's `sqlite3` module (version depends on Python build; check `sqlite3.sqlite_version`).
 
 ### Testing Workflow
 1.  **Unit Tests**: Run `poetry run unit-tests` for rapid validation of AST/Compiler logic.
 2.  **Integration Tests**:
-    *   Ensure the database is up: `docker-compose up -d`.
-    *   Run `poetry run integration-tests`.
+    *   Ensure the database is up and SQLite DB exists: `poetry run setup-tests`.
+    *   Run `poetry run integration-tests` (covers PostgreSQL and SQLite).
 3.  **Cleanup**: Periodically run `poetry run clean` to keep the workspace tidy.
