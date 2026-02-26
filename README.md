@@ -1,6 +1,6 @@
 # Build-a-Query
 
-A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, and MySQL.
+A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, MySQL, and Oracle.
 
 ## Features
 
@@ -11,11 +11,12 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
-- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL), `mysql-connector-python` (MySQL), and the standard library `sqlite3` (SQLite).
+- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL), `mysql-connector-python` (MySQL), `oracledb` (Oracle), and the standard library `sqlite3` (SQLite).
 
 ## Dialect Notes
 - MySQL does not support `INTERSECT` / `EXCEPT` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - SQLite does not support `DROP TABLE ... CASCADE` (the compiler raises `ValueError`).
+- Oracle does not support `IF EXISTS` / `IF NOT EXISTS` in `DROP TABLE`/`CREATE TABLE` (the compiler raises `ValueError`), and `EXCEPT` is compiled as `MINUS`.
 
 ## Installation
 
@@ -35,6 +36,9 @@ pip install buildaquery
 - **MySQL database**: A running MySQL instance (version 8.0+ recommended).
   - Example with Docker: `docker run --name mysql -e MYSQL_ROOT_PASSWORD=yourpassword -e MYSQL_DATABASE=buildaquery -d -p 3306:3306 mysql:8.0`
 - `mysql-connector-python` (automatically installed as a dependency) - the MySQL adapter for Python.
+- **Oracle database**: A running Oracle instance (Oracle XE is suitable for development).
+  - Example with Docker (Oracle XE): `docker run --name oracle-xe -e ORACLE_PASSWORD=yourpassword -e APP_USER=buildaquery -e APP_USER_PASSWORD=yourpassword -d -p 1521:1521 gvenzl/oracle-xe:21-slim`
+- `oracledb` (automatically installed as a dependency) - the Oracle adapter for Python.
 - `python-dotenv` (automatically installed as a dependency) - for loading environment variables from a `.env` file.
 - **SQLite**: Uses Python's standard library `sqlite3` module.
   - **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
@@ -59,6 +63,8 @@ DB_PASSWORD=yourpassword
 ```
 
 For MySQL, you can use a connection URL directly in code (e.g., `mysql://user:password@host:3306/dbname`) or set your own environment variables and construct the URL similarly.
+
+For Oracle, use a connection URL in the format `oracle://user:password@host:port/service_name` (for example: `oracle://buildaquery:password@127.0.0.1:1521/XEPDB1`).
 
 ### For Developers
 
@@ -225,7 +231,47 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_mysql.py`).
+### Oracle Quick Start
+
+```python
+from buildaquery.execution.oracle import OracleExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    CreateStatementNode, TableNode, ColumnDefinitionNode,
+    InsertStatementNode, ColumnNode, LiteralNode,
+    SelectStatementNode, StarNode, DropStatementNode
+)
+
+executor = OracleExecutor(connection_info="oracle://buildaquery:password@127.0.0.1:1521/XEPDB1")
+
+users_table = TableNode(name="users")
+create_stmt = CreateStatementNode(
+    table=users_table,
+    columns=[
+        ColumnDefinitionNode(name="id", data_type="NUMBER", primary_key=True),
+        ColumnDefinitionNode(name="name", data_type="VARCHAR2(255)", not_null=True),
+        ColumnDefinitionNode(name="age", data_type="NUMBER")
+    ]
+)
+executor.execute(create_stmt)
+
+insert_stmt = InsertStatementNode(
+    table=users_table,
+    columns=[ColumnNode(name="id"), ColumnNode(name="name"), ColumnNode(name="age")],
+    values=[LiteralNode(value=1), LiteralNode(value="Alice"), LiteralNode(value=30)]
+)
+executor.execute(insert_stmt)
+
+select_stmt = SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=users_table
+)
+print(executor.execute(select_stmt))
+
+drop_stmt = DropStatementNode(table=users_table, cascade=True)
+executor.execute(drop_stmt)
+```
+
+For more examples, see the `examples/` directory (including `examples/sample_mysql.py` and `examples/sample_oracle.py`).
 
 ## Development Setup
 
@@ -265,7 +311,7 @@ poetry run pytest buildaquery/tests
 
 #### Integration Tests
 
-Integration tests require PostgreSQL and MySQL databases (and the `mysql-connector-python` driver). Start the test databases using Docker:
+Integration tests require PostgreSQL, MySQL, and Oracle databases (and the respective drivers). Start the test databases using Docker:
 
 ```bash
 docker-compose up -d
@@ -299,7 +345,7 @@ poetry run python examples/sample_query.py
 
 - `buildaquery/abstract_syntax_tree/`: Defines query nodes and AST models.
 - `buildaquery/traversal/`: Base classes for AST traversal (Visitor/Transformer pattern).
-- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, MySQL).
+- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, MySQL, Oracle).
 - `buildaquery/execution/`: Database connection and execution logic.
 - `tests/`: Exhaustive unit and integration tests.
 - `examples/`: Practical demonstrations of the library.

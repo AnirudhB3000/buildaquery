@@ -10,18 +10,19 @@
 6. [PostgreSQL Compiler](#postgresql-compiler)
 7. [SQLite Compiler](#sqlite-compiler)
 8. [MySQL Compiler](#mysql-compiler)
-9. [Execution Layer](#execution-layer)
-10. [Traversal Patterns](#traversal-patterns)
-11. [Usage Examples](#usage-examples)
-12. [Advanced Topics](#advanced-topics)
-13. [Testing](#testing)
-14. [Troubleshooting](#troubleshooting)
+9. [Oracle Compiler](#oracle-compiler)
+10. [Execution Layer](#execution-layer)
+11. [Traversal Patterns](#traversal-patterns)
+12. [Usage Examples](#usage-examples)
+13. [Advanced Topics](#advanced-topics)
+14. [Testing](#testing)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Introduction
 
-**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, and MySQL.
+**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, MySQL, and Oracle.
 
 ### Design Philosophy
 
@@ -34,6 +35,7 @@
 
 - **MySQL**: `INTERSECT`, `EXCEPT`, and `DROP TABLE ... CASCADE` are not supported by the compiler (raises `ValueError`).
 - **SQLite**: `DROP TABLE ... CASCADE` is not supported by the compiler (raises `ValueError`).
+- **Oracle**: `IF EXISTS` / `IF NOT EXISTS` are not supported in `DROP TABLE` / `CREATE TABLE` (raises `ValueError`). `EXCEPT` is compiled as `MINUS`.
 
 ### Key Use Cases
 
@@ -53,9 +55,9 @@ User Code
     ↓
 Abstract Syntax Tree (AST) Layer
     ↓
-Compiler Layer (PostgreSQL / SQLite / MySQL)
+Compiler Layer (PostgreSQL / SQLite / MySQL / Oracle)
     ↓
-Execution Layer (psycopg / mysql-connector-python / sqlite3)
+Execution Layer (psycopg / mysql-connector-python / oracledb / sqlite3)
     ↓
 PostgreSQL Database / SQLite Database
 ```
@@ -77,6 +79,7 @@ Converts AST representations into executable SQL strings with parameterized valu
 - **PostgresCompiler**: Implements PostgreSQL-specific SQL generation
 - **SqliteCompiler**: Implements SQLite-specific SQL generation
 - **MySqlCompiler**: Implements MySQL-specific SQL generation
+- **OracleCompiler**: Implements Oracle-specific SQL generation
 - **Visitor Pattern**: Uses the visitor pattern to traverse the AST
 - **Parameterization**: Extracts values into a params list for safe execution
 
@@ -87,6 +90,8 @@ Handles database connections and query execution.
 - **PostgresExecutor**: Manages PostgreSQL connections via psycopg
 - **SqliteExecutor**: Manages SQLite database files via the standard library `sqlite3` module
 - **MySqlExecutor**: Manages MySQL connections via mysql-connector-python
+- **OracleExecutor**: Manages Oracle connections via oracledb
+- **OracleExecutor**: Manages Oracle connections via oracledb
 - **Connection Management**: Supports both connection strings and existing connections
 - **Methods**: `execute()`, `fetch_all()`, `fetch_one()`, `execute_raw()`
 
@@ -184,6 +189,8 @@ DB_PASSWORD=yourpassword
 For SQLite, no external database server is required. You only need a writable file path (e.g., `static/test-sqlite/db.sqlite`).
 
 For MySQL, ensure you have a running database and a connection URL (for example: `mysql://user:password@host:3306/dbname`).
+
+For Oracle, ensure you have a running database and a connection URL (for example: `oracle://user:password@host:1521/service_name`).
 
 ### First Query
 
@@ -513,7 +520,7 @@ TopClauseNode(
 )
 ```
 
-Note: In the PostgreSQL, SQLite, and MySQL compilers, `TOP` is translated into `LIMIT` (and may inject an `ORDER BY` if needed).
+Note: In the PostgreSQL, SQLite, and MySQL compilers, `TOP` is translated into `LIMIT` (and may inject an `ORDER BY` if needed). In the Oracle compiler, `TOP` is translated into `FETCH FIRST ... ROWS ONLY`.
 
 #### `CTENode`
 
@@ -891,9 +898,67 @@ print(compiled.params) # [18]
 - `INTERSECT` and `EXCEPT` are not supported and raise `ValueError`.
 - `DROP TABLE ... CASCADE` is not supported and raises `ValueError`.
 
+---
+
+## Oracle Compiler
+
+The Oracle compiler converts AST nodes into executable Oracle query strings.
+
+### How It Works
+
+1. **Initialization**: Create an `OracleCompiler` instance
+2. **Compilation**: Call `compile(ast_node)` to process the entire tree
+3. **Output**: Receive a `CompiledQuery` with SQL string and parameters
+
+### CompiledQuery
+
+```python
+@dataclass
+class CompiledQuery:
+    sql: str                    # The Oracle query string with :1, :2 placeholders
+    params: list[Any]          # List of values to be substituted
+```
+
+### Example
+
+```python
+from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode, ColumnNode, TableNode, WhereClauseNode,
+    BinaryOperationNode, LiteralNode
+)
+
+compiler = OracleCompiler()
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id"), ColumnNode(name="name")],
+    from_table=TableNode(name="users"),
+    where_clause=WhereClauseNode(
+        condition=BinaryOperationNode(
+            left=ColumnNode(name="age"),
+            operator=">",
+            right=LiteralNode(value=18)
+        )
+    )
+)
+
+compiled = compiler.compile(query)
+print(compiled.sql)    # SELECT id, name FROM users WHERE age > :1
+print(compiled.params) # [18]
+```
+
+### Oracle Notes
+
+- Uses `:1`, `:2`, ... positional bind variables.
+- `LIMIT`/`OFFSET` compile to `OFFSET ... ROWS` and `FETCH FIRST ... ROWS ONLY`.
+- `EXCEPT` compiles to `MINUS`.
+- `INTERSECT ALL` and `MINUS ALL` raise `ValueError`.
+- `IF EXISTS` / `IF NOT EXISTS` in `DROP TABLE` / `CREATE TABLE` raise `ValueError`.
+- Table aliases are emitted without `AS`.
+
 ## Execution Layer
 
-The execution layer handles database connections and query execution via psycopg (PostgreSQL) or sqlite3 (SQLite).
+The execution layer handles database connections and query execution via psycopg (PostgreSQL), sqlite3 (SQLite), mysql-connector-python (MySQL), and oracledb (Oracle).
 
 ### PostgresExecutor
 
@@ -1077,6 +1142,43 @@ The `MySqlExecutor` interface mirrors `PostgresExecutor`:
 - **Connection String Mode**: Uses a MySQL URL to open a connection per call.
 - **Existing Connection Mode**: Reuses the provided connection.
 
+### OracleExecutor
+
+#### Initialization
+
+```python
+from buildaquery.execution.oracle import OracleExecutor
+
+# Method 1: Connection URL
+executor = OracleExecutor(connection_info="oracle://user:password@localhost:1521/XEPDB1")
+
+# Method 2: Existing oracledb connection
+import oracledb
+conn = oracledb.connect(user="user", password="password", host="localhost", port=1521, service_name="XEPDB1")
+executor = OracleExecutor(connection=conn)
+
+# With custom compiler
+from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
+executor = OracleExecutor(
+    connection_info="oracle://user:password@localhost:1521/XEPDB1",
+    compiler=OracleCompiler()
+)
+```
+
+#### Methods
+
+The `OracleExecutor` interface mirrors `PostgresExecutor`:
+
+- `execute(query: CompiledQuery | ASTNode) -> Any`
+- `fetch_all(query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]`
+- `fetch_one(query: CompiledQuery | ASTNode) -> Sequence[Any] | None`
+- `execute_raw(sql: str, params: Sequence[Any] | None = None) -> None`
+
+#### Connection Management
+
+- **Connection String Mode**: Uses an Oracle URL to open a connection per call.
+- **Existing Connection Mode**: Reuses the provided connection.
+
 ---
 
 ## Traversal Patterns
@@ -1154,7 +1256,7 @@ new_query = renamer.visit(query)
 
 ## Usage Examples
 
-All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite or `MySqlExecutor` for MySQL by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
+All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, or `OracleExecutor` for Oracle by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
 
 ### Example 1: Simple SELECT
 
@@ -1573,6 +1675,7 @@ poetry run pytest tests
 ```
 
 SQLite integration tests run against the file-based database at `static/test-sqlite/db.sqlite`.
+Oracle integration tests run against the Dockerized Oracle XE container (startup may take a couple of minutes).
 
 **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 
@@ -1712,6 +1815,17 @@ poetry add mysql-connector-python
 pip install mysql-connector-python
 ```
 
+#### 8. Oracle Driver Missing
+
+**Problem**: `No module named 'oracledb'` when running Oracle integration tests.
+
+**Solution**: Install the driver:
+```bash
+poetry add oracledb
+# or
+pip install oracledb
+```
+
 ### Getting Help
 
 - Check the [README.md](../README.md) for quick start guide
@@ -1736,6 +1850,9 @@ buildaquery/
 │   ├── mysql/
 │   │   ├── mysql_compiler.py
 │   │   └── README.md
+│   ├── oracle/
+│   │   ├── oracle_compiler.py
+│   │   └── README.md
 │   ├── sqlite/
 │   │   ├── sqlite_compiler.py
 │   │   └── README.md
@@ -1743,6 +1860,7 @@ buildaquery/
 ├── execution/                # Database execution layer
 │   ├── base.py
 │   ├── mysql.py
+│   ├── oracle.py
 │   ├── postgres.py
 │   ├── sqlite.py
 │   └── README.md
@@ -1753,9 +1871,11 @@ buildaquery/
 │   ├── test_ast.py
 │   ├── test_compiler_postgres.py
 │   ├── test_compiler_mysql.py
+│   ├── test_compiler_oracle.py
 │   ├── test_compiler_sqlite.py
 │   ├── test_execution.py
 │   ├── test_execution_mysql.py
+│   ├── test_execution_oracle.py
 │   └── test_traversal.py
 ├── __init__.py
 └── __pycache__/
@@ -1766,12 +1886,14 @@ docs/                         # Documentation
 
 examples/                     # Example scripts
 ├── sample_mysql.py
+├── sample_oracle.py
 ├── sample_postgres.py
 ├── sample_sqlite.py
 └── .env
 
 tests/                        # Integration tests
 ├── conftest.py
+├── test_oracle_integration.py
 ├── test_postgres_integration.py
 ├── test_sqlite_integration.py
 └── README.md

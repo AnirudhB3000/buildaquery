@@ -19,3 +19,13 @@ services:
       - "3307:3306"
     command: --default-authentication-plugin=mysql_native_password
     restart: always
+  test_oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: buildaquery_test_oracle
+    environment:
+      ORACLE_PASSWORD: password
+      APP_USER: buildaquery
+      APP_USER_PASSWORD: password
+    ports:
+      - "1522:1521"
+    restart: always

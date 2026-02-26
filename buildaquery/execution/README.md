@@ -23,6 +23,9 @@ A concrete implementation for SQLite using Python's standard library `sqlite3` m
 ### `MySqlExecutor`
 A concrete implementation for MySQL using `mysql-connector-python`.
 
+### `OracleExecutor`
+A concrete implementation for Oracle using `oracledb`.
+
 ## Usage Example
 
 ```python
@@ -45,8 +48,24 @@ for row in rows:
     print(row)
 ```
 
+### Oracle Example
+
+```python
+from buildaquery.execution.oracle import OracleExecutor
+from buildaquery.compiler.compiled_query import CompiledQuery
+
+compiled = CompiledQuery(
+    sql="SELECT * FROM users WHERE age > :1",
+    params=[25]
+)
+
+executor = OracleExecutor(connection_info="oracle://user:password@localhost:1521/XEPDB1")
+rows = executor.fetch_all(compiled)
+```
+
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
 - `SqliteExecutor` uses the standard library `sqlite3` module (no external dependency).
 - `MySqlExecutor` requires `mysql-connector-python` (`pip install mysql-connector-python`).
+- `OracleExecutor` requires `oracledb` (`pip install oracledb`).

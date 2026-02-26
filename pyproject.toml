@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "buildaquery"
-version = "0.3.0"
-description = "A Python-based query builder for PostgreSQL, SQLite, and MySQL."
+version = "0.4.0"
+description = "A Python-based query builder for PostgreSQL, SQLite, MySQL, and Oracle."
 authors = ["Anirudh Bhattacharya <anirudhbhattacharya1@gmail.com>"]
 readme = "README.md"
 packages = [{include = "buildaquery"}]
@@ -29,6 +29,7 @@ Pygments = "2.19.2"
 typing_extensions = "4.15.0"
 tzdata = "2025.3"
 python-dotenv = "^1.2.1"
+oracledb = "^3.4.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "9.0.2"

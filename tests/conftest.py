@@ -6,12 +6,14 @@ from urllib.parse import urlparse, unquote
 from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.execution.sqlite import SqliteExecutor
 from buildaquery.execution.mysql import MySqlExecutor
+from buildaquery.execution.oracle import OracleExecutor
 
 # Use Docker credentials by default, but allow override via environment variable
 # Use 127.0.0.1 to avoid potential IPv6 resolution issues on some systems
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@127.0.0.1:5433/buildaquery_test")
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", os.path.join("static", "test-sqlite", "db.sqlite"))
 MYSQL_DATABASE_URL = os.getenv("MYSQL_DATABASE_URL", "mysql://root:password@127.0.0.1:3307/buildaquery_test")
+ORACLE_DATABASE_URL = os.getenv("ORACLE_DATABASE_URL", "oracle://buildaquery:password@127.0.0.1:1522/XEPDB1")
 
 @pytest.fixture(scope="session")
 def db_connection():
@@ -99,6 +101,24 @@ def _parse_mysql_url(url: str) -> dict[str, str | int | None]:
         "database": parsed.path.lstrip("/") if parsed.path else None
     }
 
+def _parse_oracle_url(url: str) -> dict[str, str | int | None]:
+    parsed = urlparse(url)
+    if parsed.scheme != "oracle":
+        raise ValueError("Oracle connection string must start with oracle://")
+
+    service_name = parsed.path.lstrip("/") if parsed.path else None
+    if not service_name:
+        raise ValueError("Oracle connection string must include a service name (e.g., /XEPDB1).")
+
+    config = {
+        "user": unquote(parsed.username) if parsed.username else None,
+        "password": unquote(parsed.password) if parsed.password else None,
+        "host": parsed.hostname or "127.0.0.1",
+        "port": parsed.port or 1521,
+        "service_name": service_name
+    }
+    return {key: value for key, value in config.items() if value is not None}
+
 @pytest.fixture(scope="session")
 def mysql_connection():
     """
@@ -154,6 +174,65 @@ def mysql_create_table(mysql_executor):
 
     for table_name in reversed(created_tables):
         mysql_executor.execute_raw(f"DROP TABLE IF EXISTS {table_name}")
+
+@pytest.fixture(scope="session")
+def oracle_connection():
+    """
+    Yields a connection to the Oracle test database.
+    Retries for up to 180 seconds to allow the container to start.
+    """
+    retries = 180
+    last_error: Exception | None = None
+    while retries > 0:
+        try:
+            import oracledb
+            conn = oracledb.connect(**_parse_oracle_url(ORACLE_DATABASE_URL))
+            if hasattr(conn, "autocommit"):
+                conn.autocommit = True
+            yield conn
+            conn.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+
+    error_details = f" Last error: {last_error}" if last_error else ""
+    pytest.fail(
+        f"Could not connect to Oracle test database at {ORACLE_DATABASE_URL} after 180 seconds. Is Docker running?{error_details}"
+    )
+
+@pytest.fixture(scope="function")
+def oracle_executor(oracle_connection):
+    """
+    Yields an OracleExecutor instance for running queries.
+    """
+    executor = OracleExecutor(connection=oracle_connection)
+    yield executor
+
+@pytest.fixture(scope="function")
+def oracle_create_table(oracle_executor):
+    """
+    A fixture that creates a table and ensures it is dropped after the test.
+    """
+    created_tables = []
+
+    def _create(create_node):
+        oracle_executor.execute(create_node)
+        created_tables.append(create_node.table.name)
+        return create_node.table.name
+
+    yield _create
+
+    for table_name in reversed(created_tables):
+        drop_block = (
+            "BEGIN "
+            f"EXECUTE IMMEDIATE 'DROP TABLE {table_name}'; "
+            "EXCEPTION WHEN OTHERS THEN "
+            "IF SQLCODE != -942 THEN RAISE; END IF; "
+            "END;"
+        )
+        oracle_executor.execute_raw(drop_block)
 
 @pytest.fixture(scope="function")
 def sqlite_executor(sqlite_connection):

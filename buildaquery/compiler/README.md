@@ -54,12 +54,25 @@ The initial implementation supports PostgreSQL.
 - **Set Operation Limits**: Raises a `ValueError` for `INTERSECT` and `EXCEPT` (unsupported in MySQL).
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because MySQL does not support `DROP TABLE ... CASCADE`.
 
+### Oracle (`OracleCompiler`)
+
+#### Key Features:
+- **`:1` Placeholders**: Uses Oracle-style positional bind parameters.
+- **LIMIT/OFFSET Translation**: Uses `OFFSET ... ROWS` and `FETCH FIRST ... ROWS ONLY`.
+- **TOP Translation**: Maps `TopClauseNode` to `FETCH FIRST`, with optional implicit `ORDER BY`.
+- **Set Operation Notes**:
+  - `EXCEPT` is translated to `MINUS`.
+  - `INTERSECT ALL` and `MINUS ALL` raise `ValueError`.
+- **Table Aliases**: Emits `table alias` (Oracle does not allow `AS` for table aliases).
+- **IF EXISTS/IF NOT EXISTS**: Raises `ValueError` for `DropStatementNode.if_exists=True` and `CreateStatementNode.if_not_exists=True`.
+
 ## Usage Example
 
 ```python
 from buildaquery.compiler.postgres.postgres_compiler import PostgresCompiler
 from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
 from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
+from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -75,5 +88,10 @@ print(compiled.params) # [123]
 mysql_compiler = MySqlCompiler()
 compiled = mysql_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.params) # [123]
+
+oracle_compiler = OracleCompiler()
+compiled = oracle_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = :1"
 print(compiled.params) # [123]
 ```
