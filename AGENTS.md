@@ -1,10 +1,10 @@
 # Build-a-Query Project Goals
 
-This project aims to create a query builder for Python with support for PostgreSQL, SQLite, MySQL, MariaDB, Oracle, and SQL Server. The development process is broken down into the following stages: 
+This project aims to create a query builder for Python with support for PostgreSQL, SQLite, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server. The development process is broken down into the following stages: 
 
 1.  **Abstract Syntax Tree (AST):** Define and build the necessary data structures to represent queries as an AST.
 2.  **AST Traversal:** Implement mechanisms for traversing the AST to analyze, modify, and process the query structure.
-3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, MySQL, MariaDB, Oracle, and SQL Server.
+3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
 4.  **Execution Layer:** Create layers responsible for executing the compiled SQL queries against the target databases.
 
 ---
@@ -93,6 +93,14 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added MariaDB unit tests and integration tests using Docker (`mariadb:11.4`) on port `3308`.
     *   Extended integration test fixtures to manage MariaDB connections and database lifecycle.
     *   Added MariaDB example script (`examples/sample_mariadb.py`) and documentation updates across READMEs and `docs/docs.md`.
+*   **CockroachDB Support**:
+    *   Implemented `CockroachDbCompiler` with CockroachDB-compatible placeholders (`%s`) and dialect notes.
+    *   Implemented `CockroachExecutor` using `psycopg`.
+    *   Added CockroachDB unit tests and integration tests using Docker (`cockroachdb/cockroach:v24.3.1`) on port `26258`.
+    *   Extended integration test fixtures to manage CockroachDB connections and database lifecycle.
+    *   Added CockroachDB example script (`examples/sample_cockroachdb.py`) and documentation updates across READMEs and `docs/docs.md`.
+    *   Adjusted CockroachDB Docker SQL listener to use port `26258` and aligned test defaults with the new port.
+    *   Cast CockroachDB string literals to `STRING` to avoid indeterminate parameter typing in `CASE` expressions.
 
 ---
 
@@ -106,12 +114,12 @@ This project aims to create a query builder for Python with support for PostgreS
 ### Architecture & Logic
 *   **AST Traversal:** Strictly adhere to the **Visitor Pattern**.
 *   **Compilation**: Favor **post-order traversal** to ensure sub-expressions resolve before parent nodes.
-*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `MariaDbExecutor` for MariaDB, `OracleExecutor` for Oracle, and `MsSqlExecutor` for SQL Server to leverage automatic parametrization and compilation logic.
+*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `MariaDbExecutor` for MariaDB, `CockroachExecutor` for CockroachDB, `OracleExecutor` for Oracle, and `MsSqlExecutor` for SQL Server to leverage automatic parametrization and compilation logic.
 *   **SQLite Version Note**: SQLite is provided via Python's `sqlite3` module (version depends on Python build; check `sqlite3.sqlite_version`).
 
 ### Testing Workflow
 1.  **Unit Tests**: Run `poetry run unit-tests` for rapid validation of AST/Compiler logic.
 2.  **Integration Tests**:
     *   Ensure the database is up and SQLite DB exists: `poetry run setup-tests`.
-    *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, and SQLite).
+    *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, and SQLite).
 3.  **Cleanup**: Periodically run `poetry run clean` to keep the workspace tidy.

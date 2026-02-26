@@ -48,3 +48,11 @@ services:
     ports:
       - "3308:3306"
     restart: always
+  test_cockroach:
+    image: cockroachdb/cockroach:v24.3.1
+    container_name: buildaquery_test_cockroach
+    command: start-single-node --insecure --listen-addr=127.0.0.1:26257 --sql-addr=0.0.0.0:26258 --http-addr=0.0.0.0:8080
+    ports:
+      - "26258:26258"
+      - "8081:8080"
+    restart: always

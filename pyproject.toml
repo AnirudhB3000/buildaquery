@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "buildaquery"
-version = "0.6.0"
+version = "1.0.0"
 description = "A Python-based query builder for PostgreSQL, SQLite, MySQL, and Oracle."
 authors = ["Anirudh Bhattacharya <anirudhbhattacharya1@gmail.com>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ packages = [{include = "buildaquery"}]
 license = "MIT"
 repository = "https://github.com/AnirudhB3000/buildaquery"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",

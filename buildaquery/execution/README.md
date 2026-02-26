@@ -26,6 +26,9 @@ A concrete implementation for MySQL using `mysql-connector-python`.
 ### `MariaDbExecutor`
 A concrete implementation for MariaDB using `mariadb`.
 
+### `CockroachExecutor`
+A concrete implementation for CockroachDB using `psycopg`.
+
 ### `OracleExecutor`
 A concrete implementation for Oracle using `oracledb`.
 
@@ -96,6 +99,21 @@ executor = MariaDbExecutor(connection_info="mariadb://user:password@localhost:33
 rows = executor.fetch_all(compiled)
 ```
 
+### CockroachDB Example
+
+```python
+from buildaquery.execution.cockroachdb import CockroachExecutor
+from buildaquery.compiler.compiled_query import CompiledQuery
+
+compiled = CompiledQuery(
+    sql="SELECT * FROM users WHERE age > %s",
+    params=[25]
+)
+
+executor = CockroachExecutor(connection_info="postgresql://root@localhost:26257/dbname?sslmode=disable")
+rows = executor.fetch_all(compiled)
+```
+
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
@@ -104,3 +122,4 @@ Different executors require specific database drivers:
 - `OracleExecutor` requires `oracledb` (`pip install oracledb`).
 - `MsSqlExecutor` requires `pyodbc` (`pip install pyodbc`).
 - `MariaDbExecutor` requires `mariadb` (`pip install mariadb`).
+- `CockroachExecutor` requires `psycopg` (`pip install psycopg[binary]`).

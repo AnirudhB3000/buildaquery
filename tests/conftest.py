@@ -17,6 +17,7 @@ from buildaquery.execution.mysql import MySqlExecutor
 from buildaquery.execution.oracle import OracleExecutor
 from buildaquery.execution.mssql import MsSqlExecutor
 from buildaquery.execution.mariadb import MariaDbExecutor
+from buildaquery.execution.cockroachdb import CockroachExecutor
 
 # Use Docker credentials by default, but allow override via environment variable
 # Use 127.0.0.1 to avoid potential IPv6 resolution issues on some systems
@@ -24,11 +25,12 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@127.0.0
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", os.path.join("static", "test-sqlite", "db.sqlite"))
 MYSQL_DATABASE_URL = os.getenv("MYSQL_DATABASE_URL", "mysql://root:password@127.0.0.1:3307/buildaquery_test")
 ORACLE_DATABASE_URL = os.getenv("ORACLE_DATABASE_URL", "oracle://buildaquery:password@127.0.0.1:1522/XEPDB1")
-MSSQL_DATABASE_URL = os.getenv(
-    "MSSQL_DATABASE_URL",
-    "mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes"
-)
+MSSQL_DATABASE_URL = os.getenv("MSSQL_DATABASE_URL", "mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes")
 MARIADB_DATABASE_URL = os.getenv("MARIADB_DATABASE_URL", "mariadb://root:password@127.0.0.1:3308/buildaquery_test")
+COCKROACH_DATABASE_URL = os.getenv(
+    "COCKROACH_DATABASE_URL",
+    "postgresql://root@127.0.0.1:26258/buildaquery_test?sslmode=disable"
+)
 
 @pytest.fixture(scope="session")
 def db_connection():
@@ -163,6 +165,84 @@ def _parse_mariadb_url(url: str) -> dict[str, str | int | None]:
         "port": parsed.port or 3306,
         "database": parsed.path.lstrip("/") if parsed.path else None
     }
+
+@pytest.fixture(scope="session")
+def cockroach_connection():
+    """
+    Yields a connection to the CockroachDB test database.
+    Retries for up to 60 seconds to allow the container to start.
+    """
+    retries = 60
+    last_error: Exception | None = None
+    parsed = urlparse(COCKROACH_DATABASE_URL)
+    database = parsed.path.lstrip("/") if parsed.path else "buildaquery_test"
+    sslmode = parse_qs(parsed.query).get("sslmode", ["disable"])[0]
+    admin_host = parsed.hostname or "127.0.0.1"
+    admin_port = parsed.port or 26257
+    admin_url = f"postgresql://root@{admin_host}:{admin_port}/defaultdb?sslmode={sslmode}"
+
+    while retries > 0:
+        try:
+            import psycopg
+            admin_conn = psycopg.connect(admin_url)
+            admin_conn.autocommit = True
+            with admin_conn.cursor() as cur:
+                cur.execute(f"CREATE DATABASE IF NOT EXISTS {database}")
+            admin_conn.close()
+            break
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+    else:
+        error_details = f" Last error: {last_error}" if last_error else ""
+        pytest.fail(
+            f"Could not connect to CockroachDB test database at {COCKROACH_DATABASE_URL} after 60 seconds. Is Docker running?{error_details}"
+        )
+
+    retries = 60
+    while retries > 0:
+        try:
+            import psycopg
+            conn = psycopg.connect(COCKROACH_DATABASE_URL)
+            conn.autocommit = True
+            yield conn
+            conn.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+
+    error_details = f" Last error: {last_error}" if last_error else ""
+    pytest.fail(
+        f"Could not connect to CockroachDB test database at {COCKROACH_DATABASE_URL} after 60 seconds. Is Docker running?{error_details}"
+    )
+
+@pytest.fixture(scope="function")
+def cockroach_executor(cockroach_connection):
+    """
+    Yields a CockroachExecutor instance for running queries.
+    """
+    executor = CockroachExecutor(connection=cockroach_connection)
+    yield executor
+
+@pytest.fixture(scope="function")
+def cockroach_create_table(cockroach_executor):
+    """
+    A fixture that creates a table and ensures it is dropped after the test.
+    """
+    created_tables = []
+
+    def _create(create_node):
+        cockroach_executor.execute(create_node)
+        created_tables.append(create_node.table.name)
+        return create_node.table.name
+
+    yield _create
+
+    for table_name in reversed(created_tables):
+        cockroach_executor.execute_raw(f"DROP TABLE IF EXISTS {table_name} CASCADE")
 
 @pytest.fixture(scope="session")
 def mysql_connection():

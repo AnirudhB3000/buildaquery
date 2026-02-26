@@ -85,6 +85,14 @@ The initial implementation supports PostgreSQL.
 - **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
 - **CASCADE Handling**: Allows `DROP TABLE ... CASCADE` (treated as a no-op by MariaDB).
 
+### CockroachDB (`CockroachDbCompiler`)
+
+#### Key Features:
+- **`%s` Placeholders**: Uses CockroachDB-compatible parameter style via `psycopg`.
+- **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
+- **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
+- **CASCADE Handling**: Supports `DROP TABLE ... CASCADE`.
+
 ## Usage Example
 
 ```python
@@ -94,6 +102,7 @@ from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
 from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
 from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
+from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -124,5 +133,10 @@ print(compiled.params) # [123]
 mariadb_compiler = MariaDbCompiler()
 compiled = mariadb_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
+print(compiled.params) # [123]
+
+cockroach_compiler = CockroachDbCompiler()
+compiled = cockroach_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 ```

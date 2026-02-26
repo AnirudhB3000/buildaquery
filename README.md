@@ -1,6 +1,6 @@
 # Build-a-Query
 
-A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, MySQL, MariaDB, Oracle, and SQL Server.
+A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
 
 ## Features
 
@@ -11,7 +11,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
-- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
+- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 
 ## Dialect Notes
 - MySQL does not support `INTERSECT` / `EXCEPT` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
@@ -19,6 +19,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - Oracle does not support `IF EXISTS` / `IF NOT EXISTS` in `DROP TABLE`/`CREATE TABLE` (the compiler raises `ValueError`), and `EXCEPT` is compiled as `MINUS`.
 - SQL Server does not support `EXCEPT ALL` / `INTERSECT ALL` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - MariaDB supports `INTERSECT` / `EXCEPT` (including `ALL`), and accepts `DROP TABLE ... CASCADE` (treated as a no-op).
+- CockroachDB supports `INTERSECT` / `EXCEPT` (including `ALL`) and `DROP TABLE ... CASCADE`.
 
 ## Installation
 
@@ -41,6 +42,8 @@ pip install buildaquery
 - **MariaDB database**: A running MariaDB instance (MariaDB 10.3+ recommended).
   - Example with Docker (MariaDB): `docker run --name mariadb -e MARIADB_ROOT_PASSWORD=yourpassword -e MARIADB_DATABASE=buildaquery -d -p 3306:3306 mariadb:11.4`
 - `mariadb` (automatically installed as a dependency) - the MariaDB adapter for Python.
+- **CockroachDB database**: A running CockroachDB instance.
+  - Example with Docker (CockroachDB): `docker run --name cockroach -p 26257:26257 -p 8080:8080 cockroachdb/cockroach:v24.3.1 start-single-node --insecure`
 - **Oracle database**: A running Oracle instance (Oracle XE is suitable for development).
   - Example with Docker (Oracle XE): `docker run --name oracle-xe -e ORACLE_PASSWORD=yourpassword -e APP_USER=buildaquery -e APP_USER_PASSWORD=yourpassword -d -p 1521:1521 gvenzl/oracle-xe:21-slim`
 - `oracledb` (automatically installed as a dependency) - the Oracle adapter for Python.
@@ -77,6 +80,8 @@ For Oracle, use a connection URL in the format `oracle://user:password@host:port
 For SQL Server, use a connection URL in the format `mssql://user:password@host:port/dbname?driver=...` (for example: `mssql://sa:password@127.0.0.1:1433/buildaquery?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes`).
 
 For MariaDB, use a connection URL in the format `mariadb://user:password@host:port/dbname` (for example: `mariadb://root:password@127.0.0.1:3306/buildaquery`).
+
+For CockroachDB, use a connection URL in the format `postgresql://user@host:port/dbname?sslmode=disable` (for example: `postgresql://root@127.0.0.1:26257/buildaquery?sslmode=disable`).
 
 ### For Developers
 
@@ -363,7 +368,47 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, and `examples/sample_mariadb.py`).
+### CockroachDB Quick Start
+
+```python
+from buildaquery.execution.cockroachdb import CockroachExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    CreateStatementNode, TableNode, ColumnDefinitionNode,
+    InsertStatementNode, ColumnNode, LiteralNode,
+    SelectStatementNode, StarNode, DropStatementNode
+)
+
+executor = CockroachExecutor(connection_info="postgresql://root@127.0.0.1:26257/buildaquery?sslmode=disable")
+
+users_table = TableNode(name="users")
+create_stmt = CreateStatementNode(
+    table=users_table,
+    columns=[
+        ColumnDefinitionNode(name="id", data_type="INT", primary_key=True),
+        ColumnDefinitionNode(name="name", data_type="STRING", not_null=True),
+        ColumnDefinitionNode(name="age", data_type="INT")
+    ]
+)
+executor.execute(create_stmt)
+
+insert_stmt = InsertStatementNode(
+    table=users_table,
+    columns=[ColumnNode(name="id"), ColumnNode(name="name"), ColumnNode(name="age")],
+    values=[LiteralNode(value=1), LiteralNode(value="Alice"), LiteralNode(value=30)]
+)
+executor.execute(insert_stmt)
+
+select_stmt = SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=users_table
+)
+print(executor.execute(select_stmt))
+
+drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
+executor.execute(drop_stmt)
+```
+
+For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, and `examples/sample_cockroachdb.py`).
 
 ## Development Setup
 
@@ -403,7 +448,7 @@ poetry run pytest buildaquery/tests
 
 #### Integration Tests
 
-Integration tests require PostgreSQL, MySQL, MariaDB, Oracle, and SQL Server databases (and the respective drivers). Start the test databases using Docker:
+Integration tests require PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases (and the respective drivers). Start the test databases using Docker:
 
 ```bash
 docker-compose up -d
@@ -416,6 +461,7 @@ poetry run pytest tests
 ```
 
 SQLite integration tests use the file-based database at `static/test-sqlite/db.sqlite`.
+CockroachDB integration tests use the SQL port `26258` by default (see `tests/README.md` for the full URL and override env var).
 
 #### All Tests
 
@@ -437,7 +483,7 @@ poetry run python examples/sample_query.py
 
 - `buildaquery/abstract_syntax_tree/`: Defines query nodes and AST models.
 - `buildaquery/traversal/`: Base classes for AST traversal (Visitor/Transformer pattern).
-- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, MySQL, MariaDB, Oracle, SQL Server).
+- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, MySQL, MariaDB, CockroachDB, Oracle, SQL Server).
 - `buildaquery/execution/`: Database connection and execution logic.
 - `tests/`: Exhaustive unit and integration tests.
 - `examples/`: Practical demonstrations of the library.
