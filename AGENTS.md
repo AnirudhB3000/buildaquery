@@ -1,10 +1,10 @@
 # Build-a-Query Project Goals
 
-This project aims to create a query builder for Python with support for PostgreSQL, SQLite, MySQL, Oracle, and SQL Server. The development process is broken down into the following stages: 
+This project aims to create a query builder for Python with support for PostgreSQL, SQLite, MySQL, MariaDB, Oracle, and SQL Server. The development process is broken down into the following stages: 
 
 1.  **Abstract Syntax Tree (AST):** Define and build the necessary data structures to represent queries as an AST.
 2.  **AST Traversal:** Implement mechanisms for traversing the AST to analyze, modify, and process the query structure.
-3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, MySQL, Oracle, and SQL Server.
+3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, MySQL, MariaDB, Oracle, and SQL Server.
 4.  **Execution Layer:** Create layers responsible for executing the compiled SQL queries against the target databases.
 
 ---
@@ -87,6 +87,12 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Extended integration test fixtures to manage SQL Server connections and database lifecycle.
     *   Added SQL Server example script (`examples/sample_mssql.py`) and documentation updates across READMEs and `docs/docs.md`.
     *   Normalized SQL Server integration test result rows to tuples for consistent assertions.
+*   **MariaDB Support**:
+    *   Implemented `MariaDbCompiler` with MariaDB-compatible placeholders (`?`) and dialect notes.
+    *   Implemented `MariaDbExecutor` using `mariadb`.
+    *   Added MariaDB unit tests and integration tests using Docker (`mariadb:11.4`) on port `3308`.
+    *   Extended integration test fixtures to manage MariaDB connections and database lifecycle.
+    *   Added MariaDB example script (`examples/sample_mariadb.py`) and documentation updates across READMEs and `docs/docs.md`.
 
 ---
 
@@ -100,12 +106,12 @@ This project aims to create a query builder for Python with support for PostgreS
 ### Architecture & Logic
 *   **AST Traversal:** Strictly adhere to the **Visitor Pattern**.
 *   **Compilation**: Favor **post-order traversal** to ensure sub-expressions resolve before parent nodes.
-*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `OracleExecutor` for Oracle, and `MsSqlExecutor` for SQL Server to leverage automatic parametrization and compilation logic.
+*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `MariaDbExecutor` for MariaDB, `OracleExecutor` for Oracle, and `MsSqlExecutor` for SQL Server to leverage automatic parametrization and compilation logic.
 *   **SQLite Version Note**: SQLite is provided via Python's `sqlite3` module (version depends on Python build; check `sqlite3.sqlite_version`).
 
 ### Testing Workflow
 1.  **Unit Tests**: Run `poetry run unit-tests` for rapid validation of AST/Compiler logic.
 2.  **Integration Tests**:
     *   Ensure the database is up and SQLite DB exists: `poetry run setup-tests`.
-    *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, Oracle, SQL Server, and SQLite).
+    *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, and SQLite).
 3.  **Cleanup**: Periodically run `poetry run clean` to keep the workspace tidy.

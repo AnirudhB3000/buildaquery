@@ -3,5 +3,6 @@ from buildaquery.execution.sqlite import SqliteExecutor
 from buildaquery.execution.mysql import MySqlExecutor
 from buildaquery.execution.oracle import OracleExecutor
 from buildaquery.execution.mssql import MsSqlExecutor
+from buildaquery.execution.mariadb import MariaDbExecutor
 
-__all__ = ["PostgresExecutor", "SqliteExecutor", "MySqlExecutor", "OracleExecutor", "MsSqlExecutor"]
+__all__ = ["PostgresExecutor", "SqliteExecutor", "MySqlExecutor", "OracleExecutor", "MsSqlExecutor", "MariaDbExecutor"]

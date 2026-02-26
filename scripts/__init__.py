@@ -57,7 +57,7 @@ def clean_project():
     print("Cleanup complete.")
 
 def setup_tests():
-    """Prepare integration test dependencies (Postgres + MySQL + Oracle + SQL Server + SQLite)."""
+    """Prepare integration test dependencies (Postgres + MySQL + MariaDB + Oracle + SQL Server + SQLite)."""
     print("Starting Docker services for integration tests...")
     docker_result = subprocess.run(["docker-compose", "up", "-d"], check=False)
     if docker_result.returncode != 0:

@@ -77,6 +77,14 @@ The initial implementation supports PostgreSQL.
   - `INTERSECT ALL` and `EXCEPT ALL` raise `ValueError`.
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQL Server does not support `DROP TABLE ... CASCADE`.
 
+### MariaDB (`MariaDbCompiler`)
+
+#### Key Features:
+- **`?` Placeholders**: Uses MariaDB-compatible parameter style (qmark).
+- **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
+- **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
+- **CASCADE Handling**: Allows `DROP TABLE ... CASCADE` (treated as a no-op by MariaDB).
+
 ## Usage Example
 
 ```python
@@ -85,6 +93,7 @@ from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
 from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
 from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
 from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
+from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -109,6 +118,11 @@ print(compiled.params) # [123]
 
 mssql_compiler = MsSqlCompiler()
 compiled = mssql_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
+print(compiled.params) # [123]
+
+mariadb_compiler = MariaDbCompiler()
+compiled = mariadb_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
 print(compiled.params) # [123]
 ```

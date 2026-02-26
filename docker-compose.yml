@@ -39,3 +39,12 @@ services:
     ports:
       - "1434:1433"
     restart: always
+  test_mariadb:
+    image: mariadb:11.4
+    container_name: buildaquery_test_mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: password
+      MARIADB_DATABASE: buildaquery_test
+    ports:
+      - "3308:3306"
+    restart: always

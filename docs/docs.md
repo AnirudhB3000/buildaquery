@@ -10,20 +10,21 @@
 6. [PostgreSQL Compiler](#postgresql-compiler)
 7. [SQLite Compiler](#sqlite-compiler)
 8. [MySQL Compiler](#mysql-compiler)
-9. [Oracle Compiler](#oracle-compiler)
-10. [SQL Server Compiler](#sql-server-compiler)
-11. [Execution Layer](#execution-layer)
-12. [Traversal Patterns](#traversal-patterns)
-13. [Usage Examples](#usage-examples)
-14. [Advanced Topics](#advanced-topics)
-15. [Testing](#testing)
-16. [Troubleshooting](#troubleshooting)
+9. [MariaDB Compiler](#mariadb-compiler)
+10. [Oracle Compiler](#oracle-compiler)
+11. [SQL Server Compiler](#sql-server-compiler)
+12. [Execution Layer](#execution-layer)
+13. [Traversal Patterns](#traversal-patterns)
+14. [Usage Examples](#usage-examples)
+15. [Advanced Topics](#advanced-topics)
+16. [Testing](#testing)
+17. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Introduction
 
-**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, MySQL, Oracle, and SQL Server.
+**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, MySQL, MariaDB, Oracle, and SQL Server.
 
 ### Design Philosophy
 
@@ -38,6 +39,7 @@
 - **SQLite**: `DROP TABLE ... CASCADE` is not supported by the compiler (raises `ValueError`).
 - **Oracle**: `IF EXISTS` / `IF NOT EXISTS` are not supported in `DROP TABLE` / `CREATE TABLE` (raises `ValueError`). `EXCEPT` is compiled as `MINUS`.
 - **SQL Server**: `EXCEPT ALL` / `INTERSECT ALL` and `DROP TABLE ... CASCADE` are not supported by the compiler (raises `ValueError`).
+- **MariaDB**: `INTERSECT` / `EXCEPT` are supported (including `ALL`), and `DROP TABLE ... CASCADE` is accepted as a no-op.
 
 ### Key Use Cases
 
@@ -57,11 +59,11 @@ User Code
     ↓
 Abstract Syntax Tree (AST) Layer
     ↓
-Compiler Layer (PostgreSQL / SQLite / MySQL / Oracle / SQL Server)
+Compiler Layer (PostgreSQL / SQLite / MySQL / MariaDB / Oracle / SQL Server)
     ↓
-Execution Layer (psycopg / mysql-connector-python / oracledb / pyodbc / sqlite3)
+Execution Layer (psycopg / mysql-connector-python / mariadb / oracledb / pyodbc / sqlite3)
     ↓
-PostgreSQL / MySQL / Oracle / SQL Server / SQLite Databases
+PostgreSQL / MySQL / MariaDB / Oracle / SQL Server / SQLite Databases
 ```
 
 ### Layer Breakdown
@@ -81,6 +83,7 @@ Converts AST representations into executable SQL strings with parameterized valu
 - **PostgresCompiler**: Implements PostgreSQL-specific SQL generation
 - **SqliteCompiler**: Implements SQLite-specific SQL generation
 - **MySqlCompiler**: Implements MySQL-specific SQL generation
+- **MariaDbCompiler**: Implements MariaDB-specific SQL generation
 - **OracleCompiler**: Implements Oracle-specific SQL generation
 - **MsSqlCompiler**: Implements SQL Server-specific SQL generation
 - **Visitor Pattern**: Uses the visitor pattern to traverse the AST
@@ -93,6 +96,7 @@ Handles database connections and query execution.
 - **PostgresExecutor**: Manages PostgreSQL connections via psycopg
 - **SqliteExecutor**: Manages SQLite database files via the standard library `sqlite3` module
 - **MySqlExecutor**: Manages MySQL connections via mysql-connector-python
+- **MariaDbExecutor**: Manages MariaDB connections via mariadb
 - **OracleExecutor**: Manages Oracle connections via oracledb
 - **MsSqlExecutor**: Manages SQL Server connections via pyodbc
 - **Connection Management**: Supports both connection strings and existing connections
@@ -194,6 +198,8 @@ For SQLite, no external database server is required. You only need a writable fi
 For MySQL, ensure you have a running database and a connection URL (for example: `mysql://user:password@host:3306/dbname`).
 
 For Oracle, ensure you have a running database and a connection URL (for example: `oracle://user:password@host:1521/service_name`).
+
+For MariaDB, ensure you have a running database and a connection URL (for example: `mariadb://user:password@host:3306/dbname`).
 
 ### First Query
 
@@ -903,6 +909,62 @@ print(compiled.params) # [18]
 
 ---
 
+## MariaDB Compiler
+
+The MariaDB compiler converts AST nodes into executable MariaDB query strings.
+
+### How It Works
+
+1. **Initialization**: Create a `MariaDbCompiler` instance
+2. **Compilation**: Call `compile(ast_node)` to process the entire tree
+3. **Output**: Receive a `CompiledQuery` with SQL string and parameters
+
+### CompiledQuery
+
+```python
+@dataclass
+class CompiledQuery:
+    sql: str                    # The MariaDB query string with ? placeholders
+    params: list[Any]          # List of values to be substituted
+```
+
+### Example
+
+```python
+from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode, ColumnNode, TableNode, WhereClauseNode,
+    BinaryOperationNode, LiteralNode
+)
+
+compiler = MariaDbCompiler()
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id"), ColumnNode(name="name")],
+    from_table=TableNode(name="users"),
+    where_clause=WhereClauseNode(
+        condition=BinaryOperationNode(
+            left=ColumnNode(name="age"),
+            operator=">",
+            right=LiteralNode(value=18)
+        )
+    )
+)
+
+compiled = compiler.compile(query)
+print(compiled.sql)    # SELECT id, name FROM users WHERE age > ?
+print(compiled.params) # [18]
+```
+
+### MariaDB Notes
+
+- Uses `?` positional bind variables.
+- `TOP` is translated to `LIMIT`.
+- `INTERSECT` and `EXCEPT` (including `ALL`) are supported.
+- `DROP TABLE ... CASCADE` is accepted (no-op in MariaDB).
+
+---
+
 ## Oracle Compiler
 
 The Oracle compiler converts AST nodes into executable Oracle query strings.
@@ -1018,7 +1080,7 @@ print(compiled.params) # [18]
 
 ## Execution Layer
 
-The execution layer handles database connections and query execution via psycopg (PostgreSQL), sqlite3 (SQLite), mysql-connector-python (MySQL), oracledb (Oracle), and pyodbc (SQL Server).
+The execution layer handles database connections and query execution via psycopg (PostgreSQL), sqlite3 (SQLite), mysql-connector-python (MySQL), mariadb (MariaDB), oracledb (Oracle), and pyodbc (SQL Server).
 
 ### PostgresExecutor
 
@@ -1202,6 +1264,43 @@ The `MySqlExecutor` interface mirrors `PostgresExecutor`:
 - **Connection String Mode**: Uses a MySQL URL to open a connection per call.
 - **Existing Connection Mode**: Reuses the provided connection.
 
+### MariaDbExecutor
+
+#### Initialization
+
+```python
+from buildaquery.execution.mariadb import MariaDbExecutor
+
+# Method 1: Connection URL
+executor = MariaDbExecutor(connection_info="mariadb://user:password@localhost:3306/dbname")
+
+# Method 2: Existing mariadb connection
+import mariadb
+conn = mariadb.connect(user="user", password="password", host="localhost", port=3306, database="dbname")
+executor = MariaDbExecutor(connection=conn)
+
+# With custom compiler
+from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
+executor = MariaDbExecutor(
+    connection_info="mariadb://user:password@localhost:3306/dbname",
+    compiler=MariaDbCompiler()
+)
+```
+
+#### Methods
+
+The `MariaDbExecutor` interface mirrors `PostgresExecutor`:
+
+- `execute(query: CompiledQuery | ASTNode) -> Any`
+- `fetch_all(query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]`
+- `fetch_one(query: CompiledQuery | ASTNode) -> Sequence[Any] | None`
+- `execute_raw(sql: str, params: Sequence[Any] | None = None) -> None`
+
+#### Connection Management
+
+- **Connection String Mode**: Uses a MariaDB URL to open a connection per call.
+- **Existing Connection Mode**: Reuses the provided connection.
+
 ### OracleExecutor
 
 #### Initialization
@@ -1353,7 +1452,7 @@ new_query = renamer.visit(query)
 
 ## Usage Examples
 
-All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `OracleExecutor` for Oracle, or `MsSqlExecutor` for SQL Server by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
+All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `MariaDbExecutor` for MariaDB, `OracleExecutor` for Oracle, or `MsSqlExecutor` for SQL Server by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
 
 ### Example 1: Simple SELECT
 
@@ -1934,6 +2033,17 @@ poetry add pyodbc
 pip install pyodbc
 ```
 
+#### 10. MariaDB Driver Missing
+
+**Problem**: `No module named 'mariadb'` when running MariaDB integration tests.
+
+**Solution**: Install the driver:
+```bash
+poetry add mariadb
+# or
+pip install mariadb
+```
+
 ### Getting Help
 
 - Check the [README.md](../README.md) for quick start guide
@@ -1958,6 +2068,9 @@ buildaquery/
 │   ├── mysql/
 │   │   ├── mysql_compiler.py
 │   │   └── README.md
+│   ├── mariadb/
+│   │   ├── mariadb_compiler.py
+│   │   └── README.md
 │   ├── oracle/
 │   │   ├── oracle_compiler.py
 │   │   └── README.md
@@ -1971,6 +2084,7 @@ buildaquery/
 ├── execution/                # Database execution layer
 │   ├── base.py
 │   ├── mysql.py
+│   ├── mariadb.py
 │   ├── mssql.py
 │   ├── oracle.py
 │   ├── postgres.py
@@ -1983,11 +2097,13 @@ buildaquery/
 │   ├── test_ast.py
 │   ├── test_compiler_postgres.py
 │   ├── test_compiler_mysql.py
+│   ├── test_compiler_mariadb.py
 │   ├── test_compiler_oracle.py
 │   ├── test_compiler_mssql.py
 │   ├── test_compiler_sqlite.py
 │   ├── test_execution.py
 │   ├── test_execution_mysql.py
+│   ├── test_execution_mariadb.py
 │   ├── test_execution_oracle.py
 │   ├── test_execution_mssql.py
 │   └── test_traversal.py
@@ -2000,6 +2116,7 @@ docs/                         # Documentation
 
 examples/                     # Example scripts
 ├── sample_mysql.py
+├── sample_mariadb.py
 ├── sample_mssql.py
 ├── sample_oracle.py
 ├── sample_postgres.py
@@ -2008,6 +2125,7 @@ examples/                     # Example scripts
 
 tests/                        # Integration tests
 ├── conftest.py
+├── test_mariadb_integration.py
 ├── test_mssql_integration.py
 ├── test_oracle_integration.py
 ├── test_postgres_integration.py

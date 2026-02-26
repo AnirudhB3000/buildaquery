@@ -1,13 +1,22 @@
 import os
 import time
+import warnings
 import pytest
 import psycopg
 from urllib.parse import urlparse, unquote, parse_qs
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"invalid escape sequence '\\\*'",
+    category=SyntaxWarning,
+    module=r"mariadb\.connectionpool"
+)
 from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.execution.sqlite import SqliteExecutor
 from buildaquery.execution.mysql import MySqlExecutor
 from buildaquery.execution.oracle import OracleExecutor
 from buildaquery.execution.mssql import MsSqlExecutor
+from buildaquery.execution.mariadb import MariaDbExecutor
 
 # Use Docker credentials by default, but allow override via environment variable
 # Use 127.0.0.1 to avoid potential IPv6 resolution issues on some systems
@@ -19,6 +28,7 @@ MSSQL_DATABASE_URL = os.getenv(
     "MSSQL_DATABASE_URL",
     "mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes"
 )
+MARIADB_DATABASE_URL = os.getenv("MARIADB_DATABASE_URL", "mariadb://root:password@127.0.0.1:3308/buildaquery_test")
 
 @pytest.fixture(scope="session")
 def db_connection():
@@ -139,6 +149,19 @@ def _parse_mssql_url(url: str) -> dict[str, str | int | None]:
         "driver": query.get("driver", "ODBC Driver 18 for SQL Server"),
         "encrypt": query.get("encrypt", "no"),
         "trust_server_certificate": query.get("trust_server_certificate", "yes")
+    }
+
+def _parse_mariadb_url(url: str) -> dict[str, str | int | None]:
+    parsed = urlparse(url)
+    if parsed.scheme != "mariadb":
+        raise ValueError("MariaDB connection string must start with mariadb://")
+
+    return {
+        "user": unquote(parsed.username) if parsed.username else None,
+        "password": unquote(parsed.password) if parsed.password else None,
+        "host": parsed.hostname or "127.0.0.1",
+        "port": parsed.port or 3306,
+        "database": parsed.path.lstrip("/") if parsed.path else None
     }
 
 @pytest.fixture(scope="session")
@@ -335,6 +358,69 @@ def mssql_create_table(mssql_executor):
 
     for table_name in reversed(created_tables):
         mssql_executor.execute_raw(f"DROP TABLE IF EXISTS {table_name}")
+
+@pytest.fixture(scope="session")
+def mariadb_connection():
+    """
+    Yields a connection to the MariaDB test database.
+    Retries for up to 30 seconds to allow the container to start.
+    """
+    retries = 30
+    last_error: Exception | None = None
+    while retries > 0:
+        try:
+            import mariadb
+            config = _parse_mariadb_url(MARIADB_DATABASE_URL)
+            database = config.get("database")
+            admin_config = {key: value for key, value in config.items() if key != "database"}
+            admin_config["database"] = "mysql"
+            admin_conn = mariadb.connect(**admin_config)
+            admin_cur = admin_conn.cursor()
+            if database:
+                admin_cur.execute(f"CREATE DATABASE IF NOT EXISTS {database}")
+            admin_cur.close()
+            admin_conn.close()
+
+            conn = mariadb.connect(**config)
+            if hasattr(conn, "autocommit"):
+                conn.autocommit = True
+            yield conn
+            conn.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+
+    error_details = f" Last error: {last_error}" if last_error else ""
+    pytest.fail(
+        f"Could not connect to MariaDB test database at {MARIADB_DATABASE_URL} after 30 seconds. Is Docker running?{error_details}"
+    )
+
+@pytest.fixture(scope="function")
+def mariadb_executor(mariadb_connection):
+    """
+    Yields a MariaDbExecutor instance for running queries.
+    """
+    executor = MariaDbExecutor(connection=mariadb_connection)
+    yield executor
+
+@pytest.fixture(scope="function")
+def mariadb_create_table(mariadb_executor):
+    """
+    A fixture that creates a table and ensures it is dropped after the test.
+    """
+    created_tables = []
+
+    def _create(create_node):
+        mariadb_executor.execute(create_node)
+        created_tables.append(create_node.table.name)
+        return create_node.table.name
+
+    yield _create
+
+    for table_name in reversed(created_tables):
+        mariadb_executor.execute_raw(f"DROP TABLE IF EXISTS {table_name}")
 
 @pytest.fixture(scope="function")
 def sqlite_executor(sqlite_connection):

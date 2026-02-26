@@ -1,13 +1,13 @@
 # Integration Tests
 
-This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, Oracle, and SQL Server databases and a SQLite database file.
+This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, Oracle, and SQL Server databases and a SQLite database file.
 
 ## Strategy
 
-We use local Docker-based PostgreSQL, MySQL, Oracle, and SQL Server instances and a file-based SQLite database for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
+We use local Docker-based PostgreSQL, MySQL, MariaDB, Oracle, and SQL Server instances and a file-based SQLite database for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
 
 ### 1. Database Infrastructure
-We use Docker to provide consistent PostgreSQL, MySQL, Oracle, and SQL Server environments without requiring local installations.
+We use Docker to provide consistent PostgreSQL, MySQL, MariaDB, Oracle, and SQL Server environments without requiring local installations.
 
 - **Image**: `postgres:15`
 - **Port**: `5433` (Mapped to 5432 in container to avoid local conflicts)
@@ -20,6 +20,13 @@ We use Docker to provide consistent PostgreSQL, MySQL, Oracle, and SQL Server en
 - **Host**: `127.0.0.1` (Explicitly used to avoid IPv6 issues)
 - **Credentials**: Configured via `docker-compose.yml` and `conftest.py`.
 - **Default URL**: `mysql://root:password@127.0.0.1:3307/buildaquery_test` (override with `MYSQL_DATABASE_URL`).
+
+#### MariaDB
+- **Image**: `mariadb:11.4`
+- **Port**: `3308` (Mapped to 3306 in container to avoid local conflicts)
+- **Host**: `127.0.0.1`
+- **Credentials**: Configured via `docker-compose.yml` and `conftest.py`.
+- **Default URL**: `mariadb://root:password@127.0.0.1:3308/buildaquery_test` (override with `MARIADB_DATABASE_URL`).
 
 #### Oracle
 - **Image**: `gvenzl/oracle-xe:21-slim`
@@ -53,6 +60,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **SQLite Integration Test**: Create `tests/test_sqlite_integration.py` using the file-based SQLite database at `static/test-sqlite/db.sqlite`.
 - [x] **Oracle Integration Test**: Create `tests/test_oracle_integration.py` using the Dockerized Oracle XE database.
 - [x] **SQL Server Integration Test**: Create `tests/test_mssql_integration.py` using the Dockerized SQL Server Express database.
+- [x] **MariaDB Integration Test**: Create `tests/test_mariadb_integration.py` using the Dockerized MariaDB database.
 
 ## How to Run
 
@@ -85,3 +93,8 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 
 - **Driver**: `pyodbc` (required for SQL Server integration tests).
 - **Default URL**: `mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes` (override with `MSSQL_DATABASE_URL`).
+
+## MariaDB Details
+
+- **Driver**: `mariadb` (required for MariaDB integration tests).
+- **Default URL**: `mariadb://root:password@127.0.0.1:3308/buildaquery_test` (override with `MARIADB_DATABASE_URL`).

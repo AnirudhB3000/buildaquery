@@ -23,6 +23,9 @@ A concrete implementation for SQLite using Python's standard library `sqlite3` m
 ### `MySqlExecutor`
 A concrete implementation for MySQL using `mysql-connector-python`.
 
+### `MariaDbExecutor`
+A concrete implementation for MariaDB using `mariadb`.
+
 ### `OracleExecutor`
 A concrete implementation for Oracle using `oracledb`.
 
@@ -78,6 +81,21 @@ executor = MsSqlExecutor(connection_info="mssql://user:password@localhost:1433/d
 rows = executor.fetch_all(compiled)
 ```
 
+### MariaDB Example
+
+```python
+from buildaquery.execution.mariadb import MariaDbExecutor
+from buildaquery.compiler.compiled_query import CompiledQuery
+
+compiled = CompiledQuery(
+    sql="SELECT * FROM users WHERE age > ?",
+    params=[25]
+)
+
+executor = MariaDbExecutor(connection_info="mariadb://user:password@localhost:3306/dbname")
+rows = executor.fetch_all(compiled)
+```
+
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
@@ -85,3 +103,4 @@ Different executors require specific database drivers:
 - `MySqlExecutor` requires `mysql-connector-python` (`pip install mysql-connector-python`).
 - `OracleExecutor` requires `oracledb` (`pip install oracledb`).
 - `MsSqlExecutor` requires `pyodbc` (`pip install pyodbc`).
+- `MariaDbExecutor` requires `mariadb` (`pip install mariadb`).
