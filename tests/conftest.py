@@ -2,11 +2,12 @@ import os
 import time
 import pytest
 import psycopg
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, parse_qs
 from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.execution.sqlite import SqliteExecutor
 from buildaquery.execution.mysql import MySqlExecutor
 from buildaquery.execution.oracle import OracleExecutor
+from buildaquery.execution.mssql import MsSqlExecutor
 
 # Use Docker credentials by default, but allow override via environment variable
 # Use 127.0.0.1 to avoid potential IPv6 resolution issues on some systems
@@ -14,6 +15,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@127.0.0
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", os.path.join("static", "test-sqlite", "db.sqlite"))
 MYSQL_DATABASE_URL = os.getenv("MYSQL_DATABASE_URL", "mysql://root:password@127.0.0.1:3307/buildaquery_test")
 ORACLE_DATABASE_URL = os.getenv("ORACLE_DATABASE_URL", "oracle://buildaquery:password@127.0.0.1:1522/XEPDB1")
+MSSQL_DATABASE_URL = os.getenv(
+    "MSSQL_DATABASE_URL",
+    "mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes"
+)
 
 @pytest.fixture(scope="session")
 def db_connection():
@@ -119,13 +124,30 @@ def _parse_oracle_url(url: str) -> dict[str, str | int | None]:
     }
     return {key: value for key, value in config.items() if value is not None}
 
+def _parse_mssql_url(url: str) -> dict[str, str | int | None]:
+    parsed = urlparse(url)
+    if parsed.scheme != "mssql":
+        raise ValueError("SQL Server connection string must start with mssql://")
+
+    query = dict((key, values[0]) for key, values in parse_qs(parsed.query).items())
+    return {
+        "user": unquote(parsed.username) if parsed.username else None,
+        "password": unquote(parsed.password) if parsed.password else None,
+        "host": parsed.hostname or "127.0.0.1",
+        "port": parsed.port or 1433,
+        "database": parsed.path.lstrip("/") if parsed.path else None,
+        "driver": query.get("driver", "ODBC Driver 18 for SQL Server"),
+        "encrypt": query.get("encrypt", "no"),
+        "trust_server_certificate": query.get("trust_server_certificate", "yes")
+    }
+
 @pytest.fixture(scope="session")
 def mysql_connection():
     """
     Yields a connection to the MySQL test database.
     Retries for up to 10 seconds to allow the container to start.
     """
-    retries = 30
+    retries = 120
     last_error: Exception | None = None
     while retries > 0:
         try:
@@ -233,6 +255,86 @@ def oracle_create_table(oracle_executor):
             "END;"
         )
         oracle_executor.execute_raw(drop_block)
+
+@pytest.fixture(scope="session")
+def mssql_connection():
+    """
+    Yields a connection to the SQL Server test database.
+    Retries for up to 30 seconds to allow the container to start.
+    """
+    retries = 30
+    last_error: Exception | None = None
+    config = _parse_mssql_url(MSSQL_DATABASE_URL)
+    database = config.get("database") or "master"
+    config["database"] = "master"
+    conn_str = MsSqlExecutor(connection_info=config)._parse_connection_info()
+
+    while retries > 0:
+        try:
+            import pyodbc
+            conn = pyodbc.connect(conn_str, autocommit=True, timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT DB_ID(?)", database)
+            exists = cur.fetchone()[0] is not None
+            if not exists:
+                cur.execute(f"CREATE DATABASE {database}")
+            cur.close()
+            conn.close()
+            break
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+    else:
+        error_details = f" Last error: {last_error}" if last_error else ""
+        pytest.fail(
+            f"Could not connect to SQL Server test database at {MSSQL_DATABASE_URL} after 120 seconds. Is Docker running?{error_details}"
+        )
+
+    config["database"] = database
+    conn_str = MsSqlExecutor(connection_info=config)._parse_connection_info()
+    retries = 120
+    while retries > 0:
+        try:
+            import pyodbc
+            conn = pyodbc.connect(conn_str, autocommit=True, timeout=5)
+            yield conn
+            conn.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            retries -= 1
+            time.sleep(1)
+
+    error_details = f" Last error: {last_error}" if last_error else ""
+    pytest.fail(
+        f"Could not connect to SQL Server test database at {MSSQL_DATABASE_URL} after 120 seconds. Is Docker running?{error_details}"
+    )
+
+@pytest.fixture(scope="function")
+def mssql_executor(mssql_connection):
+    """
+    Yields a MsSqlExecutor instance for running queries.
+    """
+    executor = MsSqlExecutor(connection=mssql_connection)
+    yield executor
+
+@pytest.fixture(scope="function")
+def mssql_create_table(mssql_executor):
+    """
+    A fixture that creates a table and ensures it is dropped after the test.
+    """
+    created_tables = []
+
+    def _create(create_node):
+        mssql_executor.execute(create_node)
+        created_tables.append(create_node.table.name)
+        return create_node.table.name
+
+    yield _create
+
+    for table_name in reversed(created_tables):
+        mssql_executor.execute_raw(f"DROP TABLE IF EXISTS {table_name}")
 
 @pytest.fixture(scope="function")
 def sqlite_executor(sqlite_connection):

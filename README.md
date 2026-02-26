@@ -1,6 +1,6 @@
 # Build-a-Query
 
-A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, MySQL, and Oracle.
+A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, MySQL, Oracle, and SQL Server.
 
 ## Features
 
@@ -11,12 +11,13 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
-- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL), `mysql-connector-python` (MySQL), `oracledb` (Oracle), and the standard library `sqlite3` (SQLite).
+- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL), `mysql-connector-python` (MySQL), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 
 ## Dialect Notes
 - MySQL does not support `INTERSECT` / `EXCEPT` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - SQLite does not support `DROP TABLE ... CASCADE` (the compiler raises `ValueError`).
 - Oracle does not support `IF EXISTS` / `IF NOT EXISTS` in `DROP TABLE`/`CREATE TABLE` (the compiler raises `ValueError`), and `EXCEPT` is compiled as `MINUS`.
+- SQL Server does not support `EXCEPT ALL` / `INTERSECT ALL` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 
 ## Installation
 
@@ -39,6 +40,9 @@ pip install buildaquery
 - **Oracle database**: A running Oracle instance (Oracle XE is suitable for development).
   - Example with Docker (Oracle XE): `docker run --name oracle-xe -e ORACLE_PASSWORD=yourpassword -e APP_USER=buildaquery -e APP_USER_PASSWORD=yourpassword -d -p 1521:1521 gvenzl/oracle-xe:21-slim`
 - `oracledb` (automatically installed as a dependency) - the Oracle adapter for Python.
+- **SQL Server database**: A running SQL Server instance (Express is suitable for development).
+  - Example with Docker (SQL Server Express): `docker run --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=yourpassword -e MSSQL_PID=Express -d -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest`
+- `pyodbc` (automatically installed as a dependency) - the SQL Server adapter for Python.
 - `python-dotenv` (automatically installed as a dependency) - for loading environment variables from a `.env` file.
 - **SQLite**: Uses Python's standard library `sqlite3` module.
   - **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
@@ -65,6 +69,8 @@ DB_PASSWORD=yourpassword
 For MySQL, you can use a connection URL directly in code (e.g., `mysql://user:password@host:3306/dbname`) or set your own environment variables and construct the URL similarly.
 
 For Oracle, use a connection URL in the format `oracle://user:password@host:port/service_name` (for example: `oracle://buildaquery:password@127.0.0.1:1521/XEPDB1`).
+
+For SQL Server, use a connection URL in the format `mssql://user:password@host:port/dbname?driver=...` (for example: `mssql://sa:password@127.0.0.1:1433/buildaquery?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes`).
 
 ### For Developers
 
@@ -271,7 +277,47 @@ drop_stmt = DropStatementNode(table=users_table, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_mysql.py` and `examples/sample_oracle.py`).
+### SQL Server Quick Start
+
+```python
+from buildaquery.execution.mssql import MsSqlExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    CreateStatementNode, TableNode, ColumnDefinitionNode,
+    InsertStatementNode, ColumnNode, LiteralNode,
+    SelectStatementNode, StarNode, DropStatementNode
+)
+
+executor = MsSqlExecutor(connection_info="mssql://sa:password@127.0.0.1:1433/buildaquery?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes")
+
+users_table = TableNode(name="users")
+create_stmt = CreateStatementNode(
+    table=users_table,
+    columns=[
+        ColumnDefinitionNode(name="id", data_type="INT", primary_key=True),
+        ColumnDefinitionNode(name="name", data_type="NVARCHAR(255)", not_null=True),
+        ColumnDefinitionNode(name="age", data_type="INT")
+    ]
+)
+executor.execute(create_stmt)
+
+insert_stmt = InsertStatementNode(
+    table=users_table,
+    columns=[ColumnNode(name="id"), ColumnNode(name="name"), ColumnNode(name="age")],
+    values=[LiteralNode(value=1), LiteralNode(value="Alice"), LiteralNode(value=30)]
+)
+executor.execute(insert_stmt)
+
+select_stmt = SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=users_table
+)
+print(executor.execute(select_stmt))
+
+drop_stmt = DropStatementNode(table=users_table, if_exists=True)
+executor.execute(drop_stmt)
+```
+
+For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, and `examples/sample_mssql.py`).
 
 ## Development Setup
 
@@ -311,7 +357,7 @@ poetry run pytest buildaquery/tests
 
 #### Integration Tests
 
-Integration tests require PostgreSQL, MySQL, and Oracle databases (and the respective drivers). Start the test databases using Docker:
+Integration tests require PostgreSQL, MySQL, Oracle, and SQL Server databases (and the respective drivers). Start the test databases using Docker:
 
 ```bash
 docker-compose up -d
@@ -345,7 +391,7 @@ poetry run python examples/sample_query.py
 
 - `buildaquery/abstract_syntax_tree/`: Defines query nodes and AST models.
 - `buildaquery/traversal/`: Base classes for AST traversal (Visitor/Transformer pattern).
-- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, MySQL, Oracle).
+- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, MySQL, Oracle, SQL Server).
 - `buildaquery/execution/`: Database connection and execution logic.
 - `tests/`: Exhaustive unit and integration tests.
 - `examples/`: Practical demonstrations of the library.

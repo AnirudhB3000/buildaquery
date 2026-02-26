@@ -66,6 +66,17 @@ The initial implementation supports PostgreSQL.
 - **Table Aliases**: Emits `table alias` (Oracle does not allow `AS` for table aliases).
 - **IF EXISTS/IF NOT EXISTS**: Raises `ValueError` for `DropStatementNode.if_exists=True` and `CreateStatementNode.if_not_exists=True`.
 
+### SQL Server (`MsSqlCompiler`)
+
+#### Key Features:
+- **`?` Placeholders**: Uses SQL Server-compatible parameter style for `pyodbc`.
+- **TOP Support**: Uses `TOP n` and can inject an implicit `ORDER BY`.
+- **LIMIT/OFFSET Translation**: Uses `OFFSET ... ROWS` and `FETCH NEXT ... ROWS ONLY`.
+- **Set Operation Notes**:
+  - `UNION`, `INTERSECT`, and `EXCEPT` are supported.
+  - `INTERSECT ALL` and `EXCEPT ALL` raise `ValueError`.
+- **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQL Server does not support `DROP TABLE ... CASCADE`.
+
 ## Usage Example
 
 ```python
@@ -73,6 +84,7 @@ from buildaquery.compiler.postgres.postgres_compiler import PostgresCompiler
 from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
 from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
 from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
+from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -93,5 +105,10 @@ print(compiled.params) # [123]
 oracle_compiler = OracleCompiler()
 compiled = oracle_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = :1"
+print(compiled.params) # [123]
+
+mssql_compiler = MsSqlCompiler()
+compiled = mssql_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
 print(compiled.params) # [123]
 ```

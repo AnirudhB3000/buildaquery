@@ -63,9 +63,25 @@ executor = OracleExecutor(connection_info="oracle://user:password@localhost:1521
 rows = executor.fetch_all(compiled)
 ```
 
+### SQL Server Example
+
+```python
+from buildaquery.execution.mssql import MsSqlExecutor
+from buildaquery.compiler.compiled_query import CompiledQuery
+
+compiled = CompiledQuery(
+    sql="SELECT * FROM users WHERE age > ?",
+    params=[25]
+)
+
+executor = MsSqlExecutor(connection_info="mssql://user:password@localhost:1433/dbname?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes")
+rows = executor.fetch_all(compiled)
+```
+
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
 - `SqliteExecutor` uses the standard library `sqlite3` module (no external dependency).
 - `MySqlExecutor` requires `mysql-connector-python` (`pip install mysql-connector-python`).
 - `OracleExecutor` requires `oracledb` (`pip install oracledb`).
+- `MsSqlExecutor` requires `pyodbc` (`pip install pyodbc`).

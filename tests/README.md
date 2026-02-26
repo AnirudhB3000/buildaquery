@@ -1,13 +1,13 @@
 # Integration Tests
 
-This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, and Oracle databases and a SQLite database file.
+This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, Oracle, and SQL Server databases and a SQLite database file.
 
 ## Strategy
 
-We use local Docker-based PostgreSQL, MySQL, and Oracle instances and a file-based SQLite database for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
+We use local Docker-based PostgreSQL, MySQL, Oracle, and SQL Server instances and a file-based SQLite database for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
 
 ### 1. Database Infrastructure
-We use Docker to provide consistent PostgreSQL, MySQL, and Oracle environments without requiring local installations.
+We use Docker to provide consistent PostgreSQL, MySQL, Oracle, and SQL Server environments without requiring local installations.
 
 - **Image**: `postgres:15`
 - **Port**: `5433` (Mapped to 5432 in container to avoid local conflicts)
@@ -28,6 +28,13 @@ We use Docker to provide consistent PostgreSQL, MySQL, and Oracle environments w
 - **Credentials**: Configured via `docker-compose.yml` and `conftest.py`.
 - **Default URL**: `oracle://buildaquery:password@127.0.0.1:1522/XEPDB1` (override with `ORACLE_DATABASE_URL`).
 
+#### SQL Server
+- **Image**: `mcr.microsoft.com/mssql/server:2022-latest` (Express)
+- **Port**: `1434` (Mapped to 1433 in container to avoid local conflicts)
+- **Host**: `127.0.0.1`
+- **Credentials**: Configured via `docker-compose.yml` and `conftest.py`.
+- **Default URL**: `mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes` (override with `MSSQL_DATABASE_URL`).
+
 ### 2. Schema Lifecycle
 The tests themselves handle table creation and cleanup using `pytest` fixtures.
 
@@ -45,6 +52,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **MySQL Integration Test**: Create `tests/test_mysql_integration.py` with the same lifecycle coverage.
 - [x] **SQLite Integration Test**: Create `tests/test_sqlite_integration.py` using the file-based SQLite database at `static/test-sqlite/db.sqlite`.
 - [x] **Oracle Integration Test**: Create `tests/test_oracle_integration.py` using the Dockerized Oracle XE database.
+- [x] **SQL Server Integration Test**: Create `tests/test_mssql_integration.py` using the Dockerized SQL Server Express database.
 
 ## How to Run
 
@@ -72,3 +80,8 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 
 - **Driver**: `oracledb` (required for Oracle integration tests).
 - **Default URL**: `oracle://buildaquery:password@127.0.0.1:1522/XEPDB1` (override with `ORACLE_DATABASE_URL`).
+
+## SQL Server Details
+
+- **Driver**: `pyodbc` (required for SQL Server integration tests).
+- **Default URL**: `mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes` (override with `MSSQL_DATABASE_URL`).

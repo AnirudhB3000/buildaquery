@@ -11,18 +11,19 @@
 7. [SQLite Compiler](#sqlite-compiler)
 8. [MySQL Compiler](#mysql-compiler)
 9. [Oracle Compiler](#oracle-compiler)
-10. [Execution Layer](#execution-layer)
-11. [Traversal Patterns](#traversal-patterns)
-12. [Usage Examples](#usage-examples)
-13. [Advanced Topics](#advanced-topics)
-14. [Testing](#testing)
-15. [Troubleshooting](#troubleshooting)
+10. [SQL Server Compiler](#sql-server-compiler)
+11. [Execution Layer](#execution-layer)
+12. [Traversal Patterns](#traversal-patterns)
+13. [Usage Examples](#usage-examples)
+14. [Advanced Topics](#advanced-topics)
+15. [Testing](#testing)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Introduction
 
-**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, MySQL, and Oracle.
+**Build-a-Query** is a Python-based query builder library designed to programmatically construct, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). The library supports PostgreSQL, SQLite, MySQL, Oracle, and SQL Server.
 
 ### Design Philosophy
 
@@ -36,6 +37,7 @@
 - **MySQL**: `INTERSECT`, `EXCEPT`, and `DROP TABLE ... CASCADE` are not supported by the compiler (raises `ValueError`).
 - **SQLite**: `DROP TABLE ... CASCADE` is not supported by the compiler (raises `ValueError`).
 - **Oracle**: `IF EXISTS` / `IF NOT EXISTS` are not supported in `DROP TABLE` / `CREATE TABLE` (raises `ValueError`). `EXCEPT` is compiled as `MINUS`.
+- **SQL Server**: `EXCEPT ALL` / `INTERSECT ALL` and `DROP TABLE ... CASCADE` are not supported by the compiler (raises `ValueError`).
 
 ### Key Use Cases
 
@@ -55,11 +57,11 @@ User Code
     ↓
 Abstract Syntax Tree (AST) Layer
     ↓
-Compiler Layer (PostgreSQL / SQLite / MySQL / Oracle)
+Compiler Layer (PostgreSQL / SQLite / MySQL / Oracle / SQL Server)
     ↓
-Execution Layer (psycopg / mysql-connector-python / oracledb / sqlite3)
+Execution Layer (psycopg / mysql-connector-python / oracledb / pyodbc / sqlite3)
     ↓
-PostgreSQL Database / SQLite Database
+PostgreSQL / MySQL / Oracle / SQL Server / SQLite Databases
 ```
 
 ### Layer Breakdown
@@ -80,6 +82,7 @@ Converts AST representations into executable SQL strings with parameterized valu
 - **SqliteCompiler**: Implements SQLite-specific SQL generation
 - **MySqlCompiler**: Implements MySQL-specific SQL generation
 - **OracleCompiler**: Implements Oracle-specific SQL generation
+- **MsSqlCompiler**: Implements SQL Server-specific SQL generation
 - **Visitor Pattern**: Uses the visitor pattern to traverse the AST
 - **Parameterization**: Extracts values into a params list for safe execution
 
@@ -91,7 +94,7 @@ Handles database connections and query execution.
 - **SqliteExecutor**: Manages SQLite database files via the standard library `sqlite3` module
 - **MySqlExecutor**: Manages MySQL connections via mysql-connector-python
 - **OracleExecutor**: Manages Oracle connections via oracledb
-- **OracleExecutor**: Manages Oracle connections via oracledb
+- **MsSqlExecutor**: Manages SQL Server connections via pyodbc
 - **Connection Management**: Supports both connection strings and existing connections
 - **Methods**: `execute()`, `fetch_all()`, `fetch_one()`, `execute_raw()`
 
@@ -956,9 +959,66 @@ print(compiled.params) # [18]
 - `IF EXISTS` / `IF NOT EXISTS` in `DROP TABLE` / `CREATE TABLE` raise `ValueError`.
 - Table aliases are emitted without `AS`.
 
+---
+
+## SQL Server Compiler
+
+The SQL Server compiler converts AST nodes into executable SQL Server query strings.
+
+### How It Works
+
+1. **Initialization**: Create an `MsSqlCompiler` instance
+2. **Compilation**: Call `compile(ast_node)` to process the entire tree
+3. **Output**: Receive a `CompiledQuery` with SQL string and parameters
+
+### CompiledQuery
+
+```python
+@dataclass
+class CompiledQuery:
+    sql: str                    # The SQL Server query string with ? placeholders
+    params: list[Any]          # List of values to be substituted
+```
+
+### Example
+
+```python
+from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode, ColumnNode, TableNode, WhereClauseNode,
+    BinaryOperationNode, LiteralNode
+)
+
+compiler = MsSqlCompiler()
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id"), ColumnNode(name="name")],
+    from_table=TableNode(name="users"),
+    where_clause=WhereClauseNode(
+        condition=BinaryOperationNode(
+            left=ColumnNode(name="age"),
+            operator=">",
+            right=LiteralNode(value=18)
+        )
+    )
+)
+
+compiled = compiler.compile(query)
+print(compiled.sql)    # SELECT id, name FROM users WHERE age > ?
+print(compiled.params) # [18]
+```
+
+### SQL Server Notes
+
+- Uses `?` positional bind variables.
+- `TOP` is supported and compiled to `TOP n`.
+- `LIMIT`/`OFFSET` compile to `OFFSET ... ROWS` and `FETCH NEXT ... ROWS ONLY` (requires `ORDER BY`).
+- `EXCEPT ALL` and `INTERSECT ALL` raise `ValueError`.
+- `DROP TABLE ... CASCADE` is not supported and raises `ValueError`.
+
 ## Execution Layer
 
-The execution layer handles database connections and query execution via psycopg (PostgreSQL), sqlite3 (SQLite), mysql-connector-python (MySQL), and oracledb (Oracle).
+The execution layer handles database connections and query execution via psycopg (PostgreSQL), sqlite3 (SQLite), mysql-connector-python (MySQL), oracledb (Oracle), and pyodbc (SQL Server).
 
 ### PostgresExecutor
 
@@ -1179,6 +1239,43 @@ The `OracleExecutor` interface mirrors `PostgresExecutor`:
 - **Connection String Mode**: Uses an Oracle URL to open a connection per call.
 - **Existing Connection Mode**: Reuses the provided connection.
 
+### MsSqlExecutor
+
+#### Initialization
+
+```python
+from buildaquery.execution.mssql import MsSqlExecutor
+
+# Method 1: Connection URL
+executor = MsSqlExecutor(connection_info="mssql://user:password@localhost:1433/dbname?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes")
+
+# Method 2: Existing pyodbc connection
+import pyodbc
+conn = pyodbc.connect("DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost,1433;DATABASE=dbname;UID=user;PWD=password;Encrypt=no;TrustServerCertificate=yes")
+executor = MsSqlExecutor(connection=conn)
+
+# With custom compiler
+from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
+executor = MsSqlExecutor(
+    connection_info="mssql://user:password@localhost:1433/dbname?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes",
+    compiler=MsSqlCompiler()
+)
+```
+
+#### Methods
+
+The `MsSqlExecutor` interface mirrors `PostgresExecutor`:
+
+- `execute(query: CompiledQuery | ASTNode) -> Any`
+- `fetch_all(query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]`
+- `fetch_one(query: CompiledQuery | ASTNode) -> Sequence[Any] | None`
+- `execute_raw(sql: str, params: Sequence[Any] | None = None) -> None`
+
+#### Connection Management
+
+- **Connection String Mode**: Uses a SQL Server URL to open a connection per call.
+- **Existing Connection Mode**: Reuses the provided connection.
+
 ---
 
 ## Traversal Patterns
@@ -1256,7 +1353,7 @@ new_query = renamer.visit(query)
 
 ## Usage Examples
 
-All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, or `OracleExecutor` for Oracle by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
+All examples use `PostgresExecutor`, but you can swap in `SqliteExecutor` for SQLite, `MySqlExecutor` for MySQL, `OracleExecutor` for Oracle, or `MsSqlExecutor` for SQL Server by changing the executor import and using the appropriate connection info. Be aware that some functions (e.g., `NOW()`) are dialect-specific and may not exist in SQLite.
 
 ### Example 1: Simple SELECT
 
@@ -1826,6 +1923,17 @@ poetry add oracledb
 pip install oracledb
 ```
 
+#### 9. SQL Server Driver Missing
+
+**Problem**: `No module named 'pyodbc'` when running SQL Server integration tests.
+
+**Solution**: Install the driver:
+```bash
+poetry add pyodbc
+# or
+pip install pyodbc
+```
+
 ### Getting Help
 
 - Check the [README.md](../README.md) for quick start guide
@@ -1853,6 +1961,9 @@ buildaquery/
 │   ├── oracle/
 │   │   ├── oracle_compiler.py
 │   │   └── README.md
+│   ├── mssql/
+│   │   ├── mssql_compiler.py
+│   │   └── README.md
 │   ├── sqlite/
 │   │   ├── sqlite_compiler.py
 │   │   └── README.md
@@ -1860,6 +1971,7 @@ buildaquery/
 ├── execution/                # Database execution layer
 │   ├── base.py
 │   ├── mysql.py
+│   ├── mssql.py
 │   ├── oracle.py
 │   ├── postgres.py
 │   ├── sqlite.py
@@ -1872,10 +1984,12 @@ buildaquery/
 │   ├── test_compiler_postgres.py
 │   ├── test_compiler_mysql.py
 │   ├── test_compiler_oracle.py
+│   ├── test_compiler_mssql.py
 │   ├── test_compiler_sqlite.py
 │   ├── test_execution.py
 │   ├── test_execution_mysql.py
 │   ├── test_execution_oracle.py
+│   ├── test_execution_mssql.py
 │   └── test_traversal.py
 ├── __init__.py
 └── __pycache__/
@@ -1886,6 +2000,7 @@ docs/                         # Documentation
 
 examples/                     # Example scripts
 ├── sample_mysql.py
+├── sample_mssql.py
 ├── sample_oracle.py
 ├── sample_postgres.py
 ├── sample_sqlite.py
@@ -1893,6 +2008,7 @@ examples/                     # Example scripts
 
 tests/                        # Integration tests
 ├── conftest.py
+├── test_mssql_integration.py
 ├── test_oracle_integration.py
 ├── test_postgres_integration.py
 ├── test_sqlite_integration.py

@@ -29,3 +29,13 @@ services:
     ports:
       - "1522:1521"
     restart: always
+  test_mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: buildaquery_test_mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Password!"
+      MSSQL_PID: "Express"
+    ports:
+      - "1434:1433"
+    restart: always
