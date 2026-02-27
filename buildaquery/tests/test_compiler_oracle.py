@@ -9,7 +9,7 @@ from buildaquery.abstract_syntax_tree.models import (
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
     CreateStatementNode, DropStatementNode, LockClauseNode,
-    ConflictTargetNode, UpsertClauseNode
+    ConflictTargetNode, UpsertClauseNode, ReturningClauseNode
 )
 
 @pytest.fixture
@@ -422,4 +422,14 @@ def test_compile_lock_clause_share_not_supported(compiler):
         lock_clause=LockClauseNode(mode="SHARE"),
     )
     with pytest.raises(ValueError, match="Oracle only supports lock mode 'UPDATE'"):
+        compiler.compile(query)
+
+def test_compile_insert_returning_not_supported(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="name")],
+        values=[LiteralNode(value="Alice")],
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id")]),
+    )
+    with pytest.raises(ValueError, match="Oracle RETURNING requires INTO/out-binds and is not yet supported"):
         compiler.compile(query)

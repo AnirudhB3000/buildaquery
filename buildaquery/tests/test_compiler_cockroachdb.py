@@ -9,7 +9,7 @@ from buildaquery.abstract_syntax_tree.models import (
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
     CreateStatementNode, DropStatementNode, LockClauseNode,
-    ConflictTargetNode, UpsertClauseNode
+    ConflictTargetNode, UpsertClauseNode, ReturningClauseNode
 )
 
 @pytest.fixture
@@ -389,3 +389,31 @@ def test_compile_lock_clause_conflict_error(compiler):
     )
     with pytest.raises(ValueError, match="NOWAIT and SKIP LOCKED are mutually exclusive"):
         compiler.compile(query)
+
+def test_compile_insert_returning(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="name"), ColumnNode(name="age")],
+        values=[LiteralNode(value="Alice"), LiteralNode(value=30)],
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id")]),
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "INSERT INTO users (name, age) VALUES (CAST(%s AS STRING), %s) RETURNING id"
+    assert compiled.params == ["Alice", 30]
+
+def test_compile_update_returning(compiler):
+    query = UpdateStatementNode(
+        table=TableNode(name="users"),
+        set_clauses={"status": LiteralNode(value="active")},
+        where_clause=WhereClauseNode(
+            condition=BinaryOperationNode(
+                left=ColumnNode(name="id"),
+                operator="=",
+                right=LiteralNode(value=1),
+            )
+        ),
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id"), ColumnNode(name="status")]),
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "UPDATE users SET status = CAST(%s AS STRING) WHERE (id = %s) RETURNING id, status"
+    assert compiled.params == ["active", 1]

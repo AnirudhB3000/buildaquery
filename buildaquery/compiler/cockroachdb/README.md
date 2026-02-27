@@ -10,6 +10,7 @@ The `CockroachDbCompiler` translates the AST into CockroachDB-compatible SQL wit
 - **DROP TABLE ... CASCADE**: Supported and emitted when requested.
 - **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
 - **Upsert**: Supports `InsertStatementNode.upsert_clause` as `ON CONFLICT (...) DO NOTHING/DO UPDATE`.
+- **Write-Return Payloads**: Supports `returning_clause` and compiles to `RETURNING ...` on `INSERT`/`UPDATE`/`DELETE`.
 
 ## Example
 

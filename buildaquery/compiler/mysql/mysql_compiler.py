@@ -37,6 +37,7 @@ from buildaquery.abstract_syntax_tree.models import (
     OverClauseNode,
     LockClauseNode,
     UpsertClauseNode,
+    ReturningClauseNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -136,6 +137,8 @@ class MySqlCompiler(Visitor):
         parts = ["DELETE FROM", self.visit(node.table)]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
+        if node.returning_clause:
+            raise ValueError("MySQL does not support generic RETURNING payloads for DELETE.")
         return " ".join(parts)
 
     def visit_InsertStatementNode(self, node: InsertStatementNode) -> str:
@@ -151,6 +154,8 @@ class MySqlCompiler(Visitor):
         sql = f"INSERT INTO {table}{cols} VALUES ({vals})"
         if node.upsert_clause:
             sql += f" {self._compile_upsert_clause(node.upsert_clause)}"
+        if node.returning_clause:
+            raise ValueError("MySQL does not support generic RETURNING payloads for INSERT.")
         return sql
 
     def _compile_upsert_clause(self, clause: UpsertClauseNode) -> str:
@@ -174,6 +179,8 @@ class MySqlCompiler(Visitor):
         parts = [f"UPDATE {table} SET {sets}"]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
+        if node.returning_clause:
+            raise ValueError("MySQL does not support generic RETURNING payloads for UPDATE.")
 
         return " ".join(parts)
 

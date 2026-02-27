@@ -116,6 +116,16 @@ This project aims to create a query builder for Python with support for PostgreS
         *   Oracle, SQL Server: `MERGE`-based upsert generation.
     *   Added comprehensive compiler unit tests and integration tests for upsert behavior (`tests/test_upsert_integration.py`).
     *   Updated project documentation and examples for upsert usage.
+*   **Write-Return Payload Support**:
+    *   Added `ReturningClauseNode` and extended `InsertStatementNode`, `UpdateStatementNode`, and `DeleteStatementNode` with optional `returning_clause`.
+    *   Implemented compiler paths for:
+        *   PostgreSQL, SQLite, CockroachDB: `RETURNING ...` for `INSERT`/`UPDATE`/`DELETE`.
+        *   MariaDB: `RETURNING ...` for `INSERT`/`DELETE` (compiler rejects `UPDATE ... RETURNING`).
+        *   SQL Server: `OUTPUT INSERTED...` / `OUTPUT DELETED...` for direct `INSERT`/`UPDATE`/`DELETE`.
+        *   MySQL: explicit `ValueError` for generic `RETURNING` payloads.
+        *   Oracle: explicit `ValueError` until `RETURNING ... INTO` out-bind support is added.
+    *   Added comprehensive compiler unit tests and integration tests for write-return behavior (`tests/test_returning_integration.py`).
+    *   Added a usage example (`examples/sample_returning.py`) and updated user/developer docs.
 
 ---
 

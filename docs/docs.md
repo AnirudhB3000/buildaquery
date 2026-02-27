@@ -144,6 +144,25 @@ query = InsertStatementNode(
 )
 ```
 
+### WRITE-RETURN PAYLOADS (`RETURNING` / `OUTPUT`)
+
+```python
+from buildaquery.abstract_syntax_tree.models import (
+    InsertStatementNode,
+    TableNode,
+    ColumnNode,
+    LiteralNode,
+    ReturningClauseNode,
+)
+
+query = InsertStatementNode(
+    table=TableNode(name="users"),
+    columns=[ColumnNode(name="name"), ColumnNode(name="email")],
+    values=[LiteralNode(value="Alice"), LiteralNode(value="alice@example.com")],
+    returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id"), ColumnNode(name="email")]),
+)
+```
+
 ### UPDATE
 
 ```python
@@ -204,6 +223,12 @@ query = DeleteStatementNode(
   - PostgreSQL, SQLite, CockroachDB use `ON CONFLICT`.
   - MySQL, MariaDB use `ON DUPLICATE KEY UPDATE`.
   - Oracle, SQL Server use `MERGE`-based upsert generation.
+- Write-return behavior:
+  - PostgreSQL, SQLite, CockroachDB compile `returning_clause` as `RETURNING`.
+  - MariaDB compiles `returning_clause` as `RETURNING` for `INSERT` and `DELETE` (not `UPDATE`).
+  - SQL Server compiles `returning_clause` as `OUTPUT INSERTED...` / `OUTPUT DELETED...`.
+  - MySQL generic `RETURNING` payloads are not supported.
+  - Oracle `RETURNING ... INTO` is not yet supported.
 
 ## Testing Commands (Repo)
 

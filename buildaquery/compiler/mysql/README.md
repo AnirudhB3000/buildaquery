@@ -12,6 +12,7 @@ The `MySqlCompiler` translates the AST into MySQL-compatible SQL with `%s` place
 - **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
 - **Upsert**: Supports `InsertStatementNode.upsert_clause` as `ON DUPLICATE KEY UPDATE` via `update_columns`.
 - **Upsert Limitation**: `do_nothing` and explicit `conflict_target` are rejected for MySQL.
+- **Write-Return Limitation**: Generic `returning_clause` payloads are rejected for MySQL.
 
 ## Example
 

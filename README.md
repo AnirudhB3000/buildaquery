@@ -9,6 +9,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Advanced Querying**: Support for CTEs (`WITH`), Subqueries, Set Operations (`UNION`, `INTERSECT`, `EXCEPT`), and Window Functions (`OVER`).
 - **Concurrency Controls**: Optional `lock_clause` support on `SELECT` for row locking (`FOR UPDATE`, `FOR SHARE`, `NOWAIT`, `SKIP LOCKED`) with dialect-aware behavior.
 - **Dialect-Aware Upsert**: `InsertStatementNode.upsert_clause` supports conflict handling across dialects (`ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, and `MERGE`-based paths).
+- **Write-Return Payloads**: `returning_clause` on `INSERT`/`UPDATE`/`DELETE` supports `RETURNING` and SQL Server `OUTPUT` equivalents.
 - **Rich Expression Logic**: Includes `CASE` expressions, `IN`, `BETWEEN`, and type casting.
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
@@ -27,6 +28,12 @@ A Python-based query builder designed to represent, compile, and execute SQL que
   - PostgreSQL, SQLite, CockroachDB: `ON CONFLICT (...) DO NOTHING` / `DO UPDATE`.
   - MySQL, MariaDB: `ON DUPLICATE KEY UPDATE` (no `DO NOTHING` mode in this AST contract).
   - Oracle, SQL Server: `MERGE`-based upsert generation from `InsertStatementNode` + `upsert_clause`.
+- Write-return behavior:
+  - PostgreSQL, SQLite, CockroachDB: `RETURNING ...` on `INSERT`/`UPDATE`/`DELETE`.
+  - MariaDB: `RETURNING ...` on `INSERT`/`DELETE` (not `UPDATE` in this compiler).
+  - SQL Server: `OUTPUT INSERTED...` / `OUTPUT DELETED...` compiled from `returning_clause`.
+  - MySQL: generic `RETURNING` payloads are not supported in this compiler.
+  - Oracle: `RETURNING ... INTO` requires out-bind plumbing and is not yet supported.
 
 ## Installation
 
@@ -418,6 +425,7 @@ executor.execute(drop_stmt)
 For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, and `examples/sample_cockroachdb.py`).
 For transaction control, see `examples/sample_transactions.py`.
 For upsert patterns, see `examples/sample_upsert.py`.
+For write-return payloads, see `examples/sample_returning.py`.
 
 ## Development Setup
 

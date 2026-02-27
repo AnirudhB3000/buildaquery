@@ -24,6 +24,7 @@ This sub-module provides the concrete implementation of the SQL compiler for Pos
     - Handles PostgreSQL-specific operator precedence through grouping.
     - Supports `lock_clause` (`LockClauseNode`) for `FOR UPDATE` / `FOR SHARE` with optional `NOWAIT` / `SKIP LOCKED`.
     - Supports upsert compilation through `InsertStatementNode.upsert_clause` -> `ON CONFLICT (...) DO NOTHING/DO UPDATE`.
+    - Supports write-return payloads through `returning_clause` -> `RETURNING ...` on `INSERT`/`UPDATE`/`DELETE`.
 
 ## Implementation Details
 

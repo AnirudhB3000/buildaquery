@@ -9,7 +9,7 @@ from buildaquery.abstract_syntax_tree.models import (
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
     CreateStatementNode, DropStatementNode, LockClauseNode,
-    ConflictTargetNode, UpsertClauseNode
+    ConflictTargetNode, UpsertClauseNode, ReturningClauseNode
 )
 
 @pytest.fixture
@@ -391,4 +391,31 @@ def test_compile_lock_clause_conflict_error(compiler):
         lock_clause=LockClauseNode(mode="SHARE", nowait=True, skip_locked=True),
     )
     with pytest.raises(ValueError, match="NOWAIT and SKIP LOCKED are mutually exclusive"):
+        compiler.compile(query)
+
+def test_compile_insert_returning(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="name"), ColumnNode(name="age")],
+        values=[LiteralNode(value="Alice"), LiteralNode(value=30)],
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id")]),
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "INSERT INTO users (name, age) VALUES (?, ?) RETURNING id"
+    assert compiled.params == ["Alice", 30]
+
+def test_compile_update_returning_not_supported(compiler):
+    query = UpdateStatementNode(
+        table=TableNode(name="users"),
+        set_clauses={"status": LiteralNode(value="active")},
+        where_clause=WhereClauseNode(
+            condition=BinaryOperationNode(
+                left=ColumnNode(name="id"),
+                operator="=",
+                right=LiteralNode(value=1),
+            )
+        ),
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id"), ColumnNode(name="status")]),
+    )
+    with pytest.raises(ValueError, match="MariaDB does not support UPDATE ... RETURNING"):
         compiler.compile(query)

@@ -20,6 +20,7 @@ The AST is built using a hierarchy of nodes, all inheriting from the base `ASTNo
 -   **`TopClauseNode`**: A specialized node for limiting results, particularly for dialects that support the `TOP` syntax. It is mutually exclusive with standard `LIMIT`/`OFFSET`.
 -   **`LockClauseNode`**: Optional row-locking clause for `SELECT` (`FOR UPDATE`, `FOR SHARE`, `NOWAIT`, `SKIP LOCKED`) with dialect-aware compiler support.
 -   **`UpsertClauseNode` + `ConflictTargetNode`**: Optional conflict/upsert metadata for `InsertStatementNode`, compiled as `ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, or `MERGE` depending on dialect.
+-   **`ReturningClauseNode`**: Optional write-return metadata for `InsertStatementNode`, `UpdateStatementNode`, and `DeleteStatementNode`, compiled as dialect-specific return payload SQL (`RETURNING`/`OUTPUT`).
 -   **`JoinClauseNode`**: Represents various types of table joins (INNER, LEFT, etc.) with associated join conditions.
 -   **Operations**: Support for both binary (e.g., `+`, `-`, `AND`, `OR`) and unary (e.g., `NOT`, `-`) operations.
 

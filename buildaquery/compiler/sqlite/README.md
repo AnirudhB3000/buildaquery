@@ -14,3 +14,4 @@ The SQLite compiler translates the AST into SQLite-compatible SQL.
 - `DROP TABLE ... CASCADE` is not supported by SQLite; the compiler raises a `ValueError` if `cascade=True`.
 - `lock_clause` is not supported in the SQLite compiler; it raises `ValueError` for row-lock clauses.
 - Upsert support is available via `InsertStatementNode.upsert_clause` and compiles to `ON CONFLICT (...) DO NOTHING/DO UPDATE`.
+- Write-return payload support is available through `returning_clause` and compiles to `RETURNING ...` on `INSERT`/`UPDATE`/`DELETE`.

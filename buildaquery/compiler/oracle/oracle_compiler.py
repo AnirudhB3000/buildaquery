@@ -38,6 +38,7 @@ from buildaquery.abstract_syntax_tree.models import (
     LockClauseNode,
     UpsertClauseNode,
     ConflictTargetNode,
+    ReturningClauseNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -138,6 +139,8 @@ class OracleCompiler(Visitor):
         parts = ["DELETE FROM", self.visit(node.table)]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
+        if node.returning_clause:
+            raise ValueError("Oracle RETURNING requires INTO/out-binds and is not yet supported.")
         return " ".join(parts)
 
     def visit_InsertStatementNode(self, node: InsertStatementNode) -> str:
@@ -146,6 +149,8 @@ class OracleCompiler(Visitor):
         """
         if node.upsert_clause:
             return self._compile_merge_upsert(node)
+        if node.returning_clause:
+            raise ValueError("Oracle RETURNING requires INTO/out-binds and is not yet supported.")
 
         table = self.visit(node.table)
         cols = ""
@@ -210,6 +215,8 @@ class OracleCompiler(Visitor):
         parts = [f"UPDATE {table} SET {sets}"]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
+        if node.returning_clause:
+            raise ValueError("Oracle RETURNING requires INTO/out-binds and is not yet supported.")
 
         return " ".join(parts)
 

@@ -14,6 +14,7 @@ The `MsSqlCompiler` translates the AST into SQL Server-compatible SQL with `?` p
 - **DROP TABLE ... CASCADE**: Not supported; raises `ValueError`.
 - **Row Locking**: `lock_clause` currently raises `ValueError` in this compiler because SQL Server locking typically uses table hints (`WITH (...)`) instead of trailing `FOR UPDATE` syntax.
 - **Upsert**: `InsertStatementNode.upsert_clause` compiles through SQL Server `MERGE` generation.
+- **Write-Return Payloads**: `returning_clause` compiles to `OUTPUT INSERTED...` / `OUTPUT DELETED...` for direct `INSERT`/`UPDATE`/`DELETE`.
 
 ## Example
 

@@ -9,7 +9,7 @@ from buildaquery.abstract_syntax_tree.models import (
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
     CreateStatementNode, DropStatementNode, LockClauseNode,
-    ConflictTargetNode, UpsertClauseNode
+    ConflictTargetNode, UpsertClauseNode, ReturningClauseNode
 )
 
 @pytest.fixture
@@ -394,4 +394,23 @@ def test_compile_lock_clause_invalid_mode_error(compiler):
         lock_clause=LockClauseNode(mode="INVALID"),
     )
     with pytest.raises(ValueError, match="MySQL lock mode must be 'UPDATE' or 'SHARE'"):
+        compiler.compile(query)
+
+def test_compile_insert_returning_not_supported(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="name")],
+        values=[LiteralNode(value="Alice")],
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id")]),
+    )
+    with pytest.raises(ValueError, match="MySQL does not support generic RETURNING payloads for INSERT"):
+        compiler.compile(query)
+
+def test_compile_update_returning_not_supported(compiler):
+    query = UpdateStatementNode(
+        table=TableNode(name="users"),
+        set_clauses={"name": LiteralNode(value="Bob")},
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id")]),
+    )
+    with pytest.raises(ValueError, match="MySQL does not support generic RETURNING payloads for UPDATE"):
         compiler.compile(query)

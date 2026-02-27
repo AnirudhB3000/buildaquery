@@ -38,6 +38,7 @@ from buildaquery.abstract_syntax_tree.models import (
     LockClauseNode,
     UpsertClauseNode,
     ConflictTargetNode,
+    ReturningClauseNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -148,6 +149,8 @@ class PostgresCompiler(Visitor):
         parts = ["DELETE FROM", self.visit(node.table)]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
+        if node.returning_clause:
+            parts.append(self._compile_returning_clause(node.returning_clause))
         return " ".join(parts)
 
     def visit_InsertStatementNode(self, node: InsertStatementNode) -> str:
@@ -163,6 +166,8 @@ class PostgresCompiler(Visitor):
         sql = f"INSERT INTO {table}{cols} VALUES ({vals})"
         if node.upsert_clause:
             sql += f" {self._compile_upsert_clause(node.upsert_clause)}"
+        if node.returning_clause:
+            sql += f" {self._compile_returning_clause(node.returning_clause)}"
         return sql
 
     def _compile_upsert_clause(self, clause: UpsertClauseNode) -> str:
@@ -198,8 +203,16 @@ class PostgresCompiler(Visitor):
         parts = [f"UPDATE {table} SET {sets}"]
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
+        if node.returning_clause:
+            parts.append(self._compile_returning_clause(node.returning_clause))
         
         return " ".join(parts)
+
+    def _compile_returning_clause(self, clause: ReturningClauseNode) -> str:
+        if not clause.expressions:
+            raise ValueError("RETURNING requires at least one expression.")
+        exprs = ", ".join([self.visit(expr) for expr in clause.expressions])
+        return f"RETURNING {exprs}"
 
     def visit_CreateStatementNode(self, node: CreateStatementNode) -> str:
         """

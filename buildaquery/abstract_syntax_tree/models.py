@@ -127,6 +127,13 @@ class UpsertClauseNode(ASTNode):
     update_columns: list[str] | None = None
 
 @dataclass
+class ReturningClauseNode(ASTNode):
+    """
+    Represents a write-return payload clause (e.g., RETURNING / OUTPUT).
+    """
+    expressions: list[ExpressionNode]
+
+@dataclass
 class TableNode(FromClauseNode):
     """
     Represents a table reference in the AST.
@@ -244,6 +251,7 @@ class DeleteStatementNode(StatementNode):
     """
     table: TableNode
     where_clause: WhereClauseNode | None = None
+    returning_clause: ReturningClauseNode | None = None
 
 @dataclass
 class ColumnDefinitionNode(ASTNode):
@@ -277,6 +285,7 @@ class InsertStatementNode(StatementNode):
     values: list[ExpressionNode]
     columns: list[ColumnNode] | None = None
     upsert_clause: UpsertClauseNode | None = None
+    returning_clause: ReturningClauseNode | None = None
 
 @dataclass
 class UpdateStatementNode(StatementNode):
@@ -286,6 +295,7 @@ class UpdateStatementNode(StatementNode):
     table: TableNode
     set_clauses: dict[str, ExpressionNode] # Map column names to new values/expressions
     where_clause: WhereClauseNode | None = None
+    returning_clause: ReturningClauseNode | None = None
 
 @dataclass
 class SetOperationNode(StatementNode):

@@ -11,6 +11,7 @@ The `MariaDbCompiler` translates the AST into MariaDB-compatible SQL with `?` pl
 - **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
 - **Upsert**: Supports `InsertStatementNode.upsert_clause` as `ON DUPLICATE KEY UPDATE` via `update_columns`.
 - **Upsert Limitation**: `do_nothing` and explicit `conflict_target` are rejected for MariaDB.
+- **Write-Return Payloads**: Supports `returning_clause` and compiles to `RETURNING ...` on `INSERT`/`DELETE`; `UPDATE ... RETURNING` is rejected.
 
 ## Example
 

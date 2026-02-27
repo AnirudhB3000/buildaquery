@@ -38,6 +38,7 @@ from buildaquery.abstract_syntax_tree.models import (
     LockClauseNode,
     UpsertClauseNode,
     ConflictTargetNode,
+    ReturningClauseNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -139,6 +140,8 @@ class MsSqlCompiler(Visitor):
         Compiles a DELETE statement.
         """
         parts = ["DELETE FROM", self.visit(node.table)]
+        if node.returning_clause:
+            parts.append(self._compile_output_clause("DELETE", node.returning_clause))
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
         return " ".join(parts)
@@ -148,6 +151,8 @@ class MsSqlCompiler(Visitor):
         Compiles an INSERT statement.
         """
         if node.upsert_clause:
+            if node.returning_clause:
+                raise ValueError("SQL Server upsert MERGE path does not support returning_clause yet.")
             return self._compile_merge_upsert(node)
 
         table = self.visit(node.table)
@@ -156,7 +161,11 @@ class MsSqlCompiler(Visitor):
             cols = f" ({', '.join([c.name for c in node.columns])})"
 
         vals = ", ".join([self.visit(v) for v in node.values])
-        return f"INSERT INTO {table}{cols} VALUES ({vals})"
+        sql = f"INSERT INTO {table}{cols}"
+        if node.returning_clause:
+            sql += f" {self._compile_output_clause('INSERT', node.returning_clause)}"
+        sql += f" VALUES ({vals})"
+        return sql
 
     def _compile_merge_upsert(self, node: InsertStatementNode) -> str:
         clause = node.upsert_clause
@@ -211,10 +220,33 @@ class MsSqlCompiler(Visitor):
         sets = ", ".join([f"{col} = {self.visit(expr)}" for col, expr in node.set_clauses.items()])
 
         parts = [f"UPDATE {table} SET {sets}"]
+        if node.returning_clause:
+            parts.append(self._compile_output_clause("UPDATE", node.returning_clause))
         if node.where_clause:
             parts.append(self.visit(node.where_clause))
 
         return " ".join(parts)
+
+    def _compile_output_clause(self, operation: str, clause: ReturningClauseNode) -> str:
+        if not clause.expressions:
+            raise ValueError("OUTPUT requires at least one expression.")
+
+        if operation == "DELETE":
+            pseudo_table = "DELETED"
+        else:
+            pseudo_table = "INSERTED"
+
+        items: list[str] = []
+        for expression in clause.expressions:
+            if isinstance(expression, StarNode):
+                items.append(f"{pseudo_table}.*")
+                continue
+            if isinstance(expression, ColumnNode):
+                items.append(f"{pseudo_table}.{expression.name}")
+                continue
+            raise ValueError("SQL Server OUTPUT currently supports only ColumnNode and StarNode expressions.")
+
+        return f"OUTPUT {', '.join(items)}"
 
     def visit_CreateStatementNode(self, node: CreateStatementNode) -> str:
         """

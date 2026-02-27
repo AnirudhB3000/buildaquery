@@ -9,7 +9,7 @@ from buildaquery.abstract_syntax_tree.models import (
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
     CreateStatementNode, DropStatementNode, LockClauseNode,
-    ConflictTargetNode, UpsertClauseNode
+    ConflictTargetNode, UpsertClauseNode, ReturningClauseNode
 )
 
 @pytest.fixture
@@ -381,3 +381,30 @@ def test_compile_lock_clause_not_supported(compiler):
         match="SQLite does not support FOR UPDATE/FOR SHARE row-lock clauses",
     ):
         compiler.compile(query)
+
+def test_compile_insert_returning(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="name"), ColumnNode(name="age")],
+        values=[LiteralNode(value="Alice"), LiteralNode(value=30)],
+        returning_clause=ReturningClauseNode(expressions=[ColumnNode(name="id")]),
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "INSERT INTO users (name, age) VALUES (?, ?) RETURNING id"
+    assert compiled.params == ["Alice", 30]
+
+def test_compile_delete_returning_star(compiler):
+    query = DeleteStatementNode(
+        table=TableNode(name="users"),
+        where_clause=WhereClauseNode(
+            condition=BinaryOperationNode(
+                left=ColumnNode(name="id"),
+                operator="=",
+                right=LiteralNode(value=7),
+            )
+        ),
+        returning_clause=ReturningClauseNode(expressions=[StarNode()]),
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "DELETE FROM users WHERE (id = ?) RETURNING *"
+    assert compiled.params == [7]
