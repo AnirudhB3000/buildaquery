@@ -9,6 +9,13 @@ This project aims to create a query builder for Python with support for PostgreS
 
 ---
 
+## Documentation Scope
+
+- `docs/docs.md` is a concise, user-facing guide focused on installation, usage, and essential commands.
+- Nested package `README.md` files under `buildaquery/` are the primary developer-facing references for internals and implementation details.
+
+---
+
 ## Changelog
 
 *   **Project Initialization:**
