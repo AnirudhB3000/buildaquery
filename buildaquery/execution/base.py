@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+import time
 from typing import Any, Sequence
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.execution.errors import ExecutionError, normalize_execution_error
+from buildaquery.execution.observability import ObservabilitySettings, QueryObservation
 from buildaquery.execution.retry import RetryPolicy, run_with_retry
 
 # ==================================================
@@ -98,6 +100,51 @@ class Executor(ABC):
             operation=operation,
             exc=exc,
         )
+
+    def _observe_query(
+        self,
+        *,
+        operation: str,
+        sql: str,
+        params: Sequence[Any] | None,
+        run: Any,
+    ) -> Any:
+        settings = getattr(self, "observability_settings", None)
+        if not isinstance(settings, ObservabilitySettings) or settings.query_observer is None:
+            return run()
+
+        started = time.perf_counter()
+        error: Exception | None = None
+        try:
+            result = run()
+            return result
+        except Exception as exc:
+            error = exc
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - started) * 1000
+            in_transaction = False
+            has_active = getattr(self, "_has_active_transaction", None)
+            if callable(has_active):
+                try:
+                    in_transaction = bool(has_active())
+                except Exception:
+                    in_transaction = False
+
+            settings.query_observer(
+                QueryObservation(
+                    dialect=self._dialect_name(),
+                    operation=operation,
+                    sql=sql,
+                    param_count=len(params) if params is not None else 0,
+                    duration_ms=duration_ms,
+                    succeeded=error is None,
+                    in_transaction=in_transaction,
+                    metadata=dict(settings.metadata),
+                    error_type=type(error).__name__ if error is not None else None,
+                    error_message=str(error) if error is not None else None,
+                )
+            )
 
     def execute_with_retry(
         self,

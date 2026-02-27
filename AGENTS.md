@@ -148,6 +148,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added executor-level connection controls for pooling hooks (`acquire_connection`, `release_connection`) and dialected connect timeout configuration (`connect_timeout_seconds`).
     *   Added lifecycle controls across executors with `close()` and context-manager support, including rollback-safe cleanup for open explicit transactions.
     *   Added connection management unit coverage (`buildaquery/tests/test_execution_connection_management.py`) and SQLite integration coverage (`tests/test_connection_management_integration.py`).
+*   **Execution Observability Hooks**:
+    *   Added structured query observation types (`ObservabilitySettings`, `QueryObservation`) for per-query timing and structured logging/tracing metadata.
+    *   Extended all executors to emit query events across `execute`, `fetch_all`, `fetch_one`, `execute_many`, and `execute_raw`.
+    *   Added observability unit coverage (`buildaquery/tests/test_execution_observability.py`) and SQLite integration coverage (`tests/test_observability_integration.py`).
 
 ---
 

@@ -36,6 +36,7 @@ poetry install
 Optional resilience path:
 4. Use `RetryPolicy` + `execute_with_retry(...)` (or `fetch_all_with_retry(...)` / `fetch_one_with_retry(...)` / `execute_many_with_retry(...)`) to retry transient failures using normalized execution errors.
 5. Use executor lifecycle and connection controls (`with ...`, `close()`, `connect_timeout_seconds`, pool hooks) for production deployments.
+6. Use `ObservabilitySettings(query_observer=..., metadata=...)` to capture query timing and structured execution events.
 
 ## Quick Start (PostgreSQL)
 
@@ -331,6 +332,9 @@ query = DeleteStatementNode(
   - All executors support `connect_timeout_seconds`.
   - All executors support pool hooks via `acquire_connection` and `release_connection`.
   - Executors support context manager lifecycle control and `close()` for resource cleanup.
+- Observability:
+  - All executors support structured query observations via `ObservabilitySettings`.
+  - Observation payloads include operation name, SQL, param count, duration, success/failure, and metadata.
 
 ## Testing Commands (Repo)
 

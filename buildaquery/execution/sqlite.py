@@ -5,6 +5,7 @@ from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
 from buildaquery.execution.base import Executor
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
+from buildaquery.execution.observability import ObservabilitySettings
 
 # ==================================================
 # SQLite Executor
@@ -24,6 +25,7 @@ class SqliteExecutor(Executor):
         connect_timeout_seconds: float | None = None,
         acquire_connection: ConnectionAcquireHook | None = None,
         release_connection: ConnectionReleaseHook | None = None,
+        observability_settings: ObservabilitySettings | None = None,
     ) -> None:
         if connection_info is None and connection is None and acquire_connection is None:
             raise ValueError("Provide connection_info, connection, or acquire_connection.")
@@ -36,6 +38,7 @@ class SqliteExecutor(Executor):
             acquire_connection=acquire_connection,
             release_connection=release_connection,
         )
+        self.observability_settings = observability_settings or ObservabilitySettings()
         self._sqlite3 = None
         self._closed = False
         self._transaction_connection: Any | None = None
@@ -103,6 +106,14 @@ class SqliteExecutor(Executor):
 
     def execute(self, query: CompiledQuery | ASTNode) -> Any:
         compiled_query = self._compile_if_needed(query)
+        return self._observe_query(
+            operation="execute",
+            sql=compiled_query.sql,
+            params=compiled_query.params,
+            run=lambda: self._execute_observed(compiled_query),
+        )
+
+    def _execute_observed(self, compiled_query: CompiledQuery) -> Any:
         conn, release_mode = self._get_connection_for_query()
         try:
             result = self._execute_with_connection(conn, compiled_query)
@@ -114,6 +125,14 @@ class SqliteExecutor(Executor):
 
     def fetch_all(self, query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]:
         compiled_query = self._compile_if_needed(query)
+        return self._observe_query(
+            operation="fetch_all",
+            sql=compiled_query.sql,
+            params=compiled_query.params,
+            run=lambda: self._fetch_all_observed(compiled_query),
+        )
+
+    def _fetch_all_observed(self, compiled_query: CompiledQuery) -> Sequence[Sequence[Any]]:
         conn, release_mode = self._get_connection_for_query()
         try:
             cur = conn.execute(compiled_query.sql, compiled_query.params)
@@ -123,6 +142,14 @@ class SqliteExecutor(Executor):
 
     def fetch_one(self, query: CompiledQuery | ASTNode) -> Sequence[Any] | None:
         compiled_query = self._compile_if_needed(query)
+        return self._observe_query(
+            operation="fetch_one",
+            sql=compiled_query.sql,
+            params=compiled_query.params,
+            run=lambda: self._fetch_one_observed(compiled_query),
+        )
+
+    def _fetch_one_observed(self, compiled_query: CompiledQuery) -> Sequence[Any] | None:
         conn, release_mode = self._get_connection_for_query()
         try:
             cur = conn.execute(compiled_query.sql, compiled_query.params)
@@ -133,6 +160,14 @@ class SqliteExecutor(Executor):
     def execute_many(self, sql: str, param_sets: Sequence[Sequence[Any]]) -> None:
         if not param_sets:
             return
+        self._observe_query(
+            operation="execute_many",
+            sql=sql,
+            params=param_sets[0],
+            run=lambda: self._execute_many_observed(sql, param_sets),
+        )
+
+    def _execute_many_observed(self, sql: str, param_sets: Sequence[Sequence[Any]]) -> None:
         conn, release_mode = self._get_connection_for_query()
         try:
             conn.executemany(sql, param_sets)
@@ -142,6 +177,14 @@ class SqliteExecutor(Executor):
             self._release_connection(conn, release_mode)
 
     def execute_raw(self, sql: str, params: Sequence[Any] | None = None) -> None:
+        self._observe_query(
+            operation="execute_raw",
+            sql=sql,
+            params=params,
+            run=lambda: self._execute_raw_observed(sql, params),
+        )
+
+    def _execute_raw_observed(self, sql: str, params: Sequence[Any] | None = None) -> None:
         conn, release_mode = self._get_connection_for_query()
         try:
             conn.execute(sql, params or [])

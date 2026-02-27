@@ -36,6 +36,14 @@ All executors support production-oriented connection controls:
 
 If `acquire_connection` is provided, executor operations use pooled connections and return them with `release_connection` (or `close()` when no release hook is provided).
 
+### Observability Hooks
+
+All executors support query-level observability through `ObservabilitySettings`:
+- `query_observer`: callback receiving a structured `QueryObservation` event.
+- `metadata`: static, tracing-safe key/value metadata attached to each query event.
+
+Each event includes dialect, operation name, SQL text, parameter count, duration in milliseconds, success/failure, transaction-state hint, and error details when a query fails.
+
 ### Normalized Error Types
 
 Retry-enabled APIs normalize backend-specific exceptions into common types:
@@ -73,6 +81,7 @@ from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.execution.retry import RetryPolicy
 from buildaquery.execution.errors import TransientExecutionError
+from buildaquery.execution.observability import ObservabilitySettings, QueryObservation
 
 # 1. Prepare the query (usually from a compiler)
 compiled = CompiledQuery(
@@ -117,6 +126,21 @@ with PostgresExecutor(
     connect_timeout_seconds=5,
 ) as managed_executor:
     managed_executor.execute(compiled)
+
+
+def on_query(event: QueryObservation) -> None:
+    print(event.operation, event.duration_ms, event.succeeded, dict(event.metadata))
+
+
+# 8. Observability hook wiring
+observed_executor = PostgresExecutor(
+    connection_info="dbname=test user=postgres password=secret",
+    observability_settings=ObservabilitySettings(
+        query_observer=on_query,
+        metadata={"service": "api"},
+    ),
+)
+observed_executor.fetch_all(compiled)
 ```
 
 ### Oracle Example

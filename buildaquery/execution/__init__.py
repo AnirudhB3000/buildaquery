@@ -7,6 +7,7 @@ from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.cockroachdb import CockroachExecutor
 from buildaquery.execution.retry import RetryPolicy
 from buildaquery.execution.connection import ConnectionSettings
+from buildaquery.execution.observability import ObservabilitySettings, QueryObservation
 from buildaquery.execution.errors import (
     ExecutionError,
     TransientExecutionError,
@@ -28,6 +29,8 @@ __all__ = [
     "CockroachExecutor",
     "RetryPolicy",
     "ConnectionSettings",
+    "ObservabilitySettings",
+    "QueryObservation",
     "ExecutionError",
     "TransientExecutionError",
     "DeadlockError",
