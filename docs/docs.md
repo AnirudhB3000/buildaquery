@@ -38,6 +38,44 @@ Optional resilience path:
 5. Use executor lifecycle and connection controls (`with ...`, `close()`, `connect_timeout_seconds`, pool hooks) for production deployments.
 6. Use `ObservabilitySettings(query_observer=..., metadata=...)` to capture query timing and structured execution events.
 
+## OLTP Features
+
+For transactional workloads, Build-a-Query provides:
+
+- Transaction control APIs: `begin()`, `commit()`, `rollback()`, `savepoint(name)`, `rollback_to_savepoint(name)`, and `release_savepoint(name)`.
+- Concurrency lock clauses on `SELECT` (dialect-aware), including `NOWAIT` and `SKIP LOCKED` on supported backends.
+- Dialect-aware upsert support with conflict handling.
+- Write-return payloads through `returning_clause` (`RETURNING`/`OUTPUT` equivalents by dialect).
+- Batch write support via `InsertStatementNode.rows` and `execute_many(...)`.
+- Retry helpers with normalized transient errors:
+  - `DeadlockError`
+  - `SerializationError`
+  - `LockTimeoutError`
+  - `ConnectionTimeoutError`
+- Connection lifecycle controls (`close()`, context manager), connect timeout (`connect_timeout_seconds`), and optional pool hooks (`acquire_connection`, `release_connection`).
+- Observability hooks through `ObservabilitySettings` for query timing and structured execution events.
+
+### Minimal Transaction + Retry Example
+
+```python
+from buildaquery.execution.postgres import PostgresExecutor
+from buildaquery.execution.retry import RetryPolicy
+
+executor = PostgresExecutor(connection_info="postgresql://user:password@localhost:5432/mydb")
+policy = RetryPolicy(max_attempts=3)
+
+executor.begin()
+try:
+    executor.execute_with_retry("UPDATE accounts SET balance = balance - %s WHERE id = %s", [50, 1], policy=policy)
+    executor.execute_with_retry("UPDATE accounts SET balance = balance + %s WHERE id = %s", [50, 2], policy=policy)
+    executor.commit()
+except Exception:
+    executor.rollback()
+    raise
+finally:
+    executor.close()
+```
+
 ## Quick Start (PostgreSQL)
 
 ```python
@@ -337,6 +375,7 @@ query = DeleteStatementNode(
   - Observation payloads include operation name, SQL, param count, duration, success/failure, and metadata.
 - OLTP integration coverage:
   - Integration tests include contention/retry success, deadlock normalization, lost-update prevention, transaction visibility isolation checks, and lock semantics (`NOWAIT`, `SKIP LOCKED`).
+  - Dedicated scenarios live in `tests/test_oltp_integration.py`.
 
 ## Testing Commands (Repo)
 

@@ -21,6 +21,21 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
 - **Observability Hooks**: Structured per-query observations (timing, operation, success/failure, tracing-safe metadata) via `ObservabilitySettings`.
 
+## OLTP Capabilities
+
+The project includes first-class OLTP-oriented support across AST, compiler, execution, and tests:
+
+- **Transactions**: `begin()`, `commit()`, `rollback()`, `savepoint(name)`, `rollback_to_savepoint(name)`, and `release_savepoint(name)`.
+- **Row locking controls**: lock clauses on `SELECT` with dialect-aware compilation (including `NOWAIT` and `SKIP LOCKED` where supported).
+- **Upsert paths**: conflict-aware writes across dialects (`ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, `MERGE` paths).
+- **Write-return payloads**: `returning_clause` support (`RETURNING` and SQL Server `OUTPUT` equivalents).
+- **Batch writes**: multi-row insert payloads via `InsertStatementNode.rows` and executor-level `execute_many(...)`.
+- **Transient retry APIs**: `execute_with_retry(...)`, `fetch_all_with_retry(...)`, `fetch_one_with_retry(...)`, `execute_many_with_retry(...)` with `RetryPolicy`.
+- **Normalized transient errors**: `DeadlockError`, `SerializationError`, `LockTimeoutError`, and `ConnectionTimeoutError`.
+- **Connection lifecycle and pool hooks**: `close()`, context-manager control, `connect_timeout_seconds`, `acquire_connection`, and `release_connection`.
+- **Observability hooks**: per-query timing and structured execution signals using `ObservabilitySettings`.
+- **OLTP integration coverage**: contention/retry correctness, deadlock normalization, lost-update prevention, isolation visibility semantics, and lock behavior validation.
+
 ## Dialect Notes
 - MySQL does not support `INTERSECT` / `EXCEPT` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - SQLite does not support `DROP TABLE ... CASCADE` (the compiler raises `ValueError`).
@@ -46,6 +61,10 @@ A Python-based query builder designed to represent, compile, and execute SQL que
   - `CreateStatementNode.constraints` supports table-level `PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, and `CHECK`.
   - `CreateIndexStatementNode` / `DropIndexStatementNode` are available with dialect-specific syntax/guards.
   - `AlterTableStatementNode` supports add/drop column and add/drop constraint actions, with dialect-specific limitations (for example, SQLite `ALTER TABLE` is intentionally restricted in this compiler).
+- Transaction and lock behavior:
+  - Lock clause behavior is dialect-specific; integration tests validate supported semantics, including `NOWAIT` and `SKIP LOCKED` paths where available.
+- Normalized retry behavior:
+  - Retry helpers target transient classes (deadlock/serialization/lock timeout/connection timeout); non-transient failures are surfaced directly.
 
 ## Installation
 
@@ -434,7 +453,7 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, and `examples/sample_cockroachdb.py`).
+For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, and `examples/sample_observability.py`).
 For transaction control, see `examples/sample_transactions.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For connection management patterns, see `examples/sample_connection_management.py`.
@@ -497,6 +516,7 @@ poetry run pytest tests
 SQLite integration tests use the file-based database at `static/test-sqlite/db.sqlite`.
 CockroachDB integration tests use the SQL port `26258` by default (see `tests/README.md` for the full URL and override env var).
 OLTP-focused integration coverage includes contention/retry correctness, deadlock normalization, lost-update prevention patterns, isolation visibility semantics, and row-lock behavior (`NOWAIT`/`SKIP LOCKED`).
+See `tests/test_oltp_integration.py` for the dedicated OLTP integration scenarios.
 
 #### All Tests
 
