@@ -335,6 +335,8 @@ query = DeleteStatementNode(
 - Observability:
   - All executors support structured query observations via `ObservabilitySettings`.
   - Observation payloads include operation name, SQL, param count, duration, success/failure, and metadata.
+- OLTP integration coverage:
+  - Integration tests include contention/retry success, deadlock normalization, lost-update prevention, transaction visibility isolation checks, and lock semantics (`NOWAIT`, `SKIP LOCKED`).
 
 ## Testing Commands (Repo)
 

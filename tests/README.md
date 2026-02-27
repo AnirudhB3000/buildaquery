@@ -8,6 +8,7 @@ It also includes cross-dialect DDL constraint/index/alter validation for OLTP sc
 It also includes normalized execution retry/error validation (SQLite lock contention and non-retryable integrity paths).
 It also includes connection lifecycle management validation (context-managed rollback safety on SQLite).
 It also includes observability hook validation (structured query events, timing, metadata propagation).
+It also includes OLTP-focused integration validation (contention/retry success, deadlock normalization, lost-update prevention patterns, isolation visibility, and lock semantics like NOWAIT/SKIP LOCKED).
 
 ## Strategy
 
@@ -84,6 +85,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **Execution Retry Integration Test**: Create `tests/test_execution_retry_integration.py` for normalized retry/error behavior.
 - [x] **Connection Management Integration Test**: Create `tests/test_connection_management_integration.py` for lifecycle rollback semantics.
 - [x] **Observability Integration Test**: Create `tests/test_observability_integration.py` for structured query event emission.
+- [x] **OLTP Focused Integration Test**: Create `tests/test_oltp_integration.py` for contention, deadlock, lost-update prevention, isolation semantics, retry correctness, and lock behavior.
 
 ## How to Run
 

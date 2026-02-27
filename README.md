@@ -496,6 +496,7 @@ poetry run pytest tests
 
 SQLite integration tests use the file-based database at `static/test-sqlite/db.sqlite`.
 CockroachDB integration tests use the SQL port `26258` by default (see `tests/README.md` for the full URL and override env var).
+OLTP-focused integration coverage includes contention/retry correctness, deadlock normalization, lost-update prevention patterns, isolation visibility semantics, and row-lock behavior (`NOWAIT`/`SKIP LOCKED`).
 
 #### All Tests
 

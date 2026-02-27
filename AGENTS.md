@@ -152,6 +152,9 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added structured query observation types (`ObservabilitySettings`, `QueryObservation`) for per-query timing and structured logging/tracing metadata.
     *   Extended all executors to emit query events across `execute`, `fetch_all`, `fetch_one`, `execute_many`, and `execute_raw`.
     *   Added observability unit coverage (`buildaquery/tests/test_execution_observability.py`) and SQLite integration coverage (`tests/test_observability_integration.py`).
+*   **OLTP-Focused Integration Coverage**:
+    *   Added `tests/test_oltp_integration.py` to validate contention with eventual retry success, deadlock normalization behavior, optimistic lost-update prevention patterns, isolation visibility semantics, and row-locking behavior (`FOR UPDATE NOWAIT` / `SKIP LOCKED`).
+    *   Updated user/developer docs to include the OLTP integration coverage scope and test references.
 
 ---
 
