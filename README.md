@@ -17,6 +17,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
 - **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 - **Transaction APIs**: First-class transaction control with `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, and `release_savepoint()` across executors.
+- **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
 
 ## Dialect Notes
 - MySQL does not support `INTERSECT` / `EXCEPT` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
@@ -433,6 +434,7 @@ executor.execute(drop_stmt)
 
 For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, and `examples/sample_cockroachdb.py`).
 For transaction control, see `examples/sample_transactions.py`.
+For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For upsert patterns, see `examples/sample_upsert.py`.
 For write-return payloads, see `examples/sample_returning.py`.
 For batch writes, see `examples/sample_batch_write.py`.

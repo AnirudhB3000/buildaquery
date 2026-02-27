@@ -12,12 +12,26 @@ An abstract base class that defines the interface for all database executors.
 - `fetch_all(compiled_query)`: Returns all rows matching the query.
 - `fetch_one(compiled_query)`: Returns the first row matching the query.
 - `execute_many(sql, param_sets)`: Runs one SQL statement against multiple parameter sets (bulk write path).
+- `execute_with_retry(compiled_query, retry_policy=None)`: Executes with transient-failure retries and normalized errors.
+- `fetch_all_with_retry(compiled_query, retry_policy=None)`: Fetches all rows with transient-failure retries and normalized errors.
+- `fetch_one_with_retry(compiled_query, retry_policy=None)`: Fetches one row with transient-failure retries and normalized errors.
+- `execute_many_with_retry(sql, param_sets, retry_policy=None)`: Bulk execution with transient-failure retries and normalized errors.
 - `begin(isolation_level=None)`: Starts an explicit transaction.
 - `commit()`: Commits the active explicit transaction.
 - `rollback()`: Rolls back the active explicit transaction.
 - `savepoint(name)`: Creates a savepoint in the active transaction.
 - `rollback_to_savepoint(name)`: Rolls back to a savepoint.
 - `release_savepoint(name)`: Releases a savepoint when supported by the dialect.
+
+### Normalized Error Types
+
+Retry-enabled APIs normalize backend-specific exceptions into common types:
+- `DeadlockError`
+- `SerializationError`
+- `LockTimeoutError`
+- `ConnectionTimeoutError`
+- `IntegrityConstraintError`
+- `ProgrammingExecutionError`
 
 ### `PostgresExecutor`
 A concrete implementation for PostgreSQL using the `psycopg` library. It handles connection management and query parametrization automatically.
@@ -44,6 +58,8 @@ A concrete implementation for Oracle using `oracledb`.
 ```python
 from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.retry import RetryPolicy
+from buildaquery.execution.errors import TransientExecutionError
 
 # 1. Prepare the query (usually from a compiler)
 compiled = CompiledQuery(
@@ -73,6 +89,14 @@ executor.execute_many(
     "INSERT INTO users(name) VALUES (%s)",
     [["Carol"], ["Dave"]],
 )
+
+# 6. Retry transient failures with normalized errors
+retry_policy = RetryPolicy(max_attempts=3, base_delay_seconds=0.05)
+try:
+    rows = executor.fetch_all_with_retry(compiled, retry_policy=retry_policy)
+except TransientExecutionError:
+    # handle exhausted transient retries
+    raise
 ```
 
 ### Oracle Example

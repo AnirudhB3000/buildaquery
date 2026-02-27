@@ -138,6 +138,12 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Extended all dialect compilers to handle expanded DDL paths with explicit dialect guards for unsupported forms.
     *   Added comprehensive unit coverage (`buildaquery/tests/test_ddl_oltp_compilers.py`) and cross-dialect integration coverage (`tests/test_ddl_constraints_integration.py`).
     *   Added DDL usage example (`examples/sample_ddl_constraints.py`) and updated project documentation.
+*   **Normalized Execution Error + Retry Support**:
+    *   Added normalized execution error taxonomy (`ExecutionError`, `TransientExecutionError`, `DeadlockError`, `SerializationError`, `LockTimeoutError`, `ConnectionTimeoutError`, `IntegrityConstraintError`, `ProgrammingExecutionError`).
+    *   Added retry policy and execution retry runner (`RetryPolicy`, `run_with_retry`) for transient failures.
+    *   Extended `Executor` with retry-enabled APIs: `execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, and `execute_many_with_retry`.
+    *   Added unit coverage for error normalization and retry behavior (`buildaquery/tests/test_execution_error_model.py`, `buildaquery/tests/test_execution_retry.py`).
+    *   Added SQLite integration coverage for normalized retry behavior under lock contention and integrity failures (`tests/test_execution_retry_integration.py`).
 
 ---
 

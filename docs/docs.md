@@ -33,6 +33,9 @@ poetry install
 2. Execute it with the executor for your database.
 3. Let Build-a-Query compile and parameterize automatically.
 
+Optional resilience path:
+4. Use `RetryPolicy` + `execute_with_retry(...)` (or `fetch_all_with_retry(...)` / `fetch_one_with_retry(...)` / `execute_many_with_retry(...)`) to retry transient failures using normalized execution errors.
+
 ## Quick Start (PostgreSQL)
 
 ```python
@@ -317,6 +320,9 @@ query = DeleteStatementNode(
   - `CreateStatementNode.constraints` supports table-level `PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, and `CHECK`.
   - `CreateIndexStatementNode` and `DropIndexStatementNode` are supported with dialect-specific `IF EXISTS`/`IF NOT EXISTS` and table-target rules.
   - `AlterTableStatementNode` supports add/drop column and add/drop constraint actions with dialect-specific restrictions.
+- Normalized execution errors:
+  - Retry helpers classify transient failures into `DeadlockError`, `SerializationError`, `LockTimeoutError`, and `ConnectionTimeoutError`.
+  - Non-transient examples include `IntegrityConstraintError` and `ProgrammingExecutionError`.
 
 ## Testing Commands (Repo)
 
