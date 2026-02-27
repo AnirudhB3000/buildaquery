@@ -123,3 +123,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Ensure the database is up and SQLite DB exists: `poetry run setup-tests`.
     *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, and SQLite).
 3.  **Cleanup**: Periodically run `poetry run clean` to keep the workspace tidy.
+
+### Edit Approval Protocol
+*   Before writing any file edit, provide the following for review:
+    *   **The change**: what will be modified.
+    *   **Impact**: what the change will affect.
+    *   **Downstream changes**: any additional updates needed because of this change.
+    *   **Goal alignment**: how the change achieves the conversation goal.
+*   Only write edits to files after explicit user approval.

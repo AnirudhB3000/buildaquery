@@ -14,8 +14,7 @@ def test_postgres_executor_fetch_all(mock_psycopg):
     executor = PostgresExecutor(connection_info="dsn")
     query = CompiledQuery(sql="SELECT %s", params=[1])
     
-    # Setup mock chain: connect -> cursor -> execute -> fetchall
-    mock_conn = mock_psycopg.connect.return_value.__enter__.return_value
+    mock_conn = mock_psycopg.connect.return_value
     mock_cur = mock_conn.cursor.return_value.__enter__.return_value
     mock_cur.fetchall.return_value = [(1,)]
     
@@ -25,17 +24,64 @@ def test_postgres_executor_fetch_all(mock_psycopg):
     mock_psycopg.connect.assert_called_once_with("dsn")
     mock_cur.execute.assert_called_once_with("SELECT %s", [1])
     mock_cur.fetchall.assert_called_once()
+    mock_conn.close.assert_called_once()
 
 def test_postgres_executor_execute(mock_psycopg):
     executor = PostgresExecutor(connection_info="dsn")
     query = CompiledQuery(sql="INSERT INTO t VALUES (%s)", params=[10])
     
-    mock_conn = mock_psycopg.connect.return_value.__enter__.return_value
+    mock_conn = mock_psycopg.connect.return_value
     mock_cur = mock_conn.cursor.return_value.__enter__.return_value
     
     executor.execute(query)
     
     mock_cur.execute.assert_called_once_with("INSERT INTO t VALUES (%s)", [10])
+    mock_conn.close.assert_called_once()
+
+def test_postgres_transaction_lifecycle_connection_info(mock_psycopg):
+    executor = PostgresExecutor(connection_info="dsn")
+    mock_conn = mock_psycopg.connect.return_value
+    mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+
+    executor.begin("SERIALIZABLE")
+    executor.savepoint("sp1")
+    executor.rollback_to_savepoint("sp1")
+    executor.release_savepoint("sp1")
+    executor.commit()
+
+    assert mock_cur.execute.call_args_list[0].args == ("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",)
+    assert mock_cur.execute.call_args_list[1].args == ("SAVEPOINT sp1",)
+    assert mock_cur.execute.call_args_list[2].args == ("ROLLBACK TO SAVEPOINT sp1",)
+    assert mock_cur.execute.call_args_list[3].args == ("RELEASE SAVEPOINT sp1",)
+    mock_conn.commit.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+def test_postgres_transaction_with_existing_connection():
+    mock_conn = MagicMock()
+    mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+    executor = PostgresExecutor(connection=mock_conn)
+
+    executor.begin()
+    executor.execute(CompiledQuery(sql="SELECT %s", params=[1]))
+    executor.rollback()
+
+    mock_cur.execute.assert_any_call("SELECT %s", [1])
+    mock_conn.rollback.assert_called_once()
+    mock_conn.close.assert_not_called()
+
+def test_postgres_transaction_errors():
+    executor = PostgresExecutor(connection=MagicMock())
+
+    with pytest.raises(RuntimeError):
+        executor.commit()
+    with pytest.raises(RuntimeError):
+        executor.rollback()
+    with pytest.raises(RuntimeError):
+        executor.savepoint("sp1")
+
+    executor.begin()
+    with pytest.raises(RuntimeError):
+        executor.begin()
 
 def test_postgres_executor_import_error():
     # Test that it raises ImportError if psycopg is missing

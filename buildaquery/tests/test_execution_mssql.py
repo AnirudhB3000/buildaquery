@@ -49,3 +49,47 @@ def test_mssql_executor_import_error():
         with pytest.raises(ImportError) as excinfo:
             executor._get_pyodbc()
         assert "pyodbc" in str(excinfo.value)
+
+def test_mssql_transaction_lifecycle_connection_info(mock_pyodbc):
+    executor = MsSqlExecutor(connection_info="mssql://user:pass@localhost:1433/db")
+    mock_conn = mock_pyodbc.connect.return_value
+    mock_cursor = mock_conn.cursor.return_value
+
+    executor.begin("READ COMMITTED")
+    executor.savepoint("sp1")
+    executor.rollback_to_savepoint("sp1")
+    executor.release_savepoint("sp1")
+    executor.commit()
+
+    mock_cursor.execute.assert_any_call("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+    mock_cursor.execute.assert_any_call("SAVE TRANSACTION sp1")
+    mock_cursor.execute.assert_any_call("ROLLBACK TRANSACTION sp1")
+    mock_conn.commit.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+def test_mssql_transaction_with_existing_connection():
+    mock_conn = MagicMock()
+    mock_cursor = mock_conn.cursor.return_value
+    executor = MsSqlExecutor(connection=mock_conn)
+
+    executor.begin()
+    executor.execute(CompiledQuery(sql="SELECT ?", params=[1]))
+    executor.rollback()
+
+    mock_cursor.execute.assert_any_call("SELECT ?", [1])
+    mock_conn.rollback.assert_called_once()
+    mock_conn.close.assert_not_called()
+
+def test_mssql_transaction_errors():
+    executor = MsSqlExecutor(connection=MagicMock())
+
+    with pytest.raises(RuntimeError):
+        executor.commit()
+    with pytest.raises(RuntimeError):
+        executor.rollback()
+    with pytest.raises(RuntimeError):
+        executor.savepoint("sp1")
+
+    executor.begin()
+    with pytest.raises(RuntimeError):
+        executor.begin()

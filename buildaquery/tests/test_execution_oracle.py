@@ -49,3 +49,47 @@ def test_oracle_executor_import_error():
         with pytest.raises(ImportError) as excinfo:
             executor._get_oracledb()
         assert "oracledb" in str(excinfo.value)
+
+def test_oracle_transaction_lifecycle_connection_info(mock_oracledb):
+    executor = OracleExecutor(connection_info="oracle://user:pass@localhost:1521/XEPDB1")
+    mock_conn = mock_oracledb.connect.return_value
+    mock_cursor = mock_conn.cursor.return_value
+
+    executor.begin("SERIALIZABLE")
+    executor.savepoint("sp1")
+    executor.rollback_to_savepoint("sp1")
+    executor.release_savepoint("sp1")
+    executor.commit()
+
+    mock_cursor.execute.assert_any_call("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+    mock_cursor.execute.assert_any_call("SAVEPOINT sp1")
+    mock_cursor.execute.assert_any_call("ROLLBACK TO SAVEPOINT sp1")
+    mock_conn.commit.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+def test_oracle_transaction_with_existing_connection():
+    mock_conn = MagicMock()
+    mock_cursor = mock_conn.cursor.return_value
+    executor = OracleExecutor(connection=mock_conn)
+
+    executor.begin()
+    executor.execute(CompiledQuery(sql="SELECT :1 FROM dual", params=[1]))
+    executor.rollback()
+
+    mock_cursor.execute.assert_any_call("SELECT :1 FROM dual", [1])
+    mock_conn.rollback.assert_called_once()
+    mock_conn.close.assert_not_called()
+
+def test_oracle_transaction_errors():
+    executor = OracleExecutor(connection=MagicMock())
+
+    with pytest.raises(RuntimeError):
+        executor.commit()
+    with pytest.raises(RuntimeError):
+        executor.rollback()
+    with pytest.raises(RuntimeError):
+        executor.savepoint("sp1")
+
+    executor.begin()
+    with pytest.raises(RuntimeError):
+        executor.begin()

@@ -29,6 +29,9 @@ class PostgresExecutor(Executor):
         self.connection = connection
         self.compiler = compiler or PostgresCompiler()
         self._psycopg = None
+        self._transaction_connection: Any | None = None
+        self._owns_transaction_connection = False
+        self._transaction_previous_autocommit: bool | None = None
 
     def _compile_if_needed(self, query: CompiledQuery | ASTNode) -> CompiledQuery:
         """
@@ -53,67 +56,150 @@ class PostgresExecutor(Executor):
                 )
         return self._psycopg
 
+    def _has_active_transaction(self) -> bool:
+        return self._transaction_connection is not None
+
+    def _get_connection_for_query(self) -> tuple[Any, bool]:
+        if self._transaction_connection is not None:
+            return self._transaction_connection, False
+        if self.connection is not None:
+            return self.connection, False
+
+        psycopg = self._get_psycopg()
+        conn = psycopg.connect(self.connection_info)
+        return conn, True
+
+    def _require_active_transaction_connection(self) -> Any:
+        if self._transaction_connection is None:
+            raise RuntimeError("No active transaction. Call begin() first.")
+        return self._transaction_connection
+
     def execute(self, query: CompiledQuery | ASTNode) -> Any:
         """
         Executes a query that does not return results (e.g., INSERT, UPDATE).
         Returns the cursor for inspection if needed, or None.
         """
         compiled_query = self._compile_if_needed(query)
-        if self.connection:
-            with self.connection.cursor() as cur:
+        conn, should_close = self._get_connection_for_query()
+        try:
+            with conn.cursor() as cur:
                 cur.execute(compiled_query.sql, compiled_query.params)
                 # Return result for SELECT queries executed via .execute() (common in tests)
                 if cur.description:
                     return cur.fetchall()
-        else:
-            psycopg = self._get_psycopg()
-            with psycopg.connect(self.connection_info) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(compiled_query.sql, compiled_query.params)
-                    if cur.description:
-                        return cur.fetchall()
+        finally:
+            if should_close:
+                if getattr(conn, "autocommit", False) is False:
+                    conn.commit()
+                conn.close()
 
     def fetch_all(self, query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]:
         """
         Executes a query and returns all resulting rows.
         """
         compiled_query = self._compile_if_needed(query)
-        if self.connection:
-            with self.connection.cursor() as cur:
+        conn, should_close = self._get_connection_for_query()
+        try:
+            with conn.cursor() as cur:
                 cur.execute(compiled_query.sql, compiled_query.params)
                 return cast(Sequence[Sequence[Any]], cur.fetchall())
-        else:
-            psycopg = self._get_psycopg()
-            with psycopg.connect(self.connection_info) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(compiled_query.sql, compiled_query.params)
-                    return cast(Sequence[Sequence[Any]], cur.fetchall())
+        finally:
+            if should_close:
+                conn.close()
 
     def fetch_one(self, query: CompiledQuery | ASTNode) -> Sequence[Any] | None:
         """
         Executes a query and returns a single resulting row.
         """
         compiled_query = self._compile_if_needed(query)
-        if self.connection:
-            with self.connection.cursor() as cur:
+        conn, should_close = self._get_connection_for_query()
+        try:
+            with conn.cursor() as cur:
                 cur.execute(compiled_query.sql, compiled_query.params)
                 return cast(Sequence[Any] | None, cur.fetchone())
-        else:
-            psycopg = self._get_psycopg()
-            with psycopg.connect(self.connection_info) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(compiled_query.sql, compiled_query.params)
-                    return cast(Sequence[Any] | None, cur.fetchone())
+        finally:
+            if should_close:
+                conn.close()
 
     def execute_raw(self, sql: str, params: Sequence[Any] | None = None) -> None:
         """
         Executes a raw SQL string.
         """
-        if self.connection:
-            with self.connection.cursor() as cur:
+        conn, should_close = self._get_connection_for_query()
+        try:
+            with conn.cursor() as cur:
                 cur.execute(sql, params)
+        finally:
+            if should_close:
+                if getattr(conn, "autocommit", False) is False:
+                    conn.commit()
+                conn.close()
+
+    def begin(self, isolation_level: str | None = None) -> None:
+        if self._has_active_transaction():
+            raise RuntimeError("Transaction already active.")
+
+        if self.connection is not None:
+            self._transaction_connection = self.connection
+            self._owns_transaction_connection = False
         else:
             psycopg = self._get_psycopg()
-            with psycopg.connect(self.connection_info) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(sql, params)
+            self._transaction_connection = psycopg.connect(self.connection_info)
+            self._owns_transaction_connection = True
+
+        if hasattr(self._transaction_connection, "autocommit"):
+            self._transaction_previous_autocommit = self._transaction_connection.autocommit
+            self._transaction_connection.autocommit = False
+        else:
+            self._transaction_previous_autocommit = None
+
+        with self._transaction_connection.cursor() as cur:
+            if isolation_level:
+                cur.execute(f"SET TRANSACTION ISOLATION LEVEL {isolation_level}")
+
+    def commit(self) -> None:
+        conn = self._require_active_transaction_connection()
+        try:
+            conn.commit()
+            if (
+                self._transaction_previous_autocommit is not None
+                and hasattr(conn, "autocommit")
+            ):
+                conn.autocommit = self._transaction_previous_autocommit
+        finally:
+            if self._owns_transaction_connection:
+                conn.close()
+            self._transaction_connection = None
+            self._owns_transaction_connection = False
+            self._transaction_previous_autocommit = None
+
+    def rollback(self) -> None:
+        conn = self._require_active_transaction_connection()
+        try:
+            conn.rollback()
+            if (
+                self._transaction_previous_autocommit is not None
+                and hasattr(conn, "autocommit")
+            ):
+                conn.autocommit = self._transaction_previous_autocommit
+        finally:
+            if self._owns_transaction_connection:
+                conn.close()
+            self._transaction_connection = None
+            self._owns_transaction_connection = False
+            self._transaction_previous_autocommit = None
+
+    def savepoint(self, name: str) -> None:
+        conn = self._require_active_transaction_connection()
+        with conn.cursor() as cur:
+            cur.execute(f"SAVEPOINT {name}")
+
+    def rollback_to_savepoint(self, name: str) -> None:
+        conn = self._require_active_transaction_connection()
+        with conn.cursor() as cur:
+            cur.execute(f"ROLLBACK TO SAVEPOINT {name}")
+
+    def release_savepoint(self, name: str) -> None:
+        conn = self._require_active_transaction_connection()
+        with conn.cursor() as cur:
+            cur.execute(f"RELEASE SAVEPOINT {name}")

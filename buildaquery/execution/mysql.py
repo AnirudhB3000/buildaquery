@@ -36,6 +36,8 @@ class MySqlExecutor(Executor):
         self.connection = connection
         self.compiler = compiler or MySqlCompiler()
         self._mysql_connector = None
+        self._transaction_connection: Any | None = None
+        self._owns_transaction_connection = False
 
     def _compile_if_needed(self, query: CompiledQuery | ASTNode) -> CompiledQuery:
         """
@@ -93,38 +95,45 @@ class MySqlExecutor(Executor):
         finally:
             cursor.close()
 
+    def _has_active_transaction(self) -> bool:
+        return self._transaction_connection is not None
+
+    def _get_connection_for_query(self) -> tuple[Any, bool]:
+        if self._transaction_connection is not None:
+            return self._transaction_connection, False
+        if self.connection is not None:
+            return self.connection, False
+
+        mysql_connector = self._get_mysql_connector()
+        conn = mysql_connector.connect(**self._parse_connection_info())
+        return conn, True
+
+    def _require_active_transaction_connection(self) -> Any:
+        if self._transaction_connection is None:
+            raise RuntimeError("No active transaction. Call begin() first.")
+        return self._transaction_connection
+
     def execute(self, query: CompiledQuery | ASTNode) -> Any:
         """
         Executes a query. Returns rows for SELECT statements, otherwise None.
         """
         compiled_query = self._compile_if_needed(query)
-        if self.connection:
-            return self._execute_with_connection(self.connection, compiled_query)
-
-        mysql_connector = self._get_mysql_connector()
-        conn = mysql_connector.connect(**self._parse_connection_info())
+        conn, should_close = self._get_connection_for_query()
         try:
             result = self._execute_with_connection(conn, compiled_query)
-            conn.commit()
+            if should_close:
+                conn.commit()
             return result
         finally:
-            conn.close()
+            if should_close:
+                conn.close()
 
     def fetch_all(self, query: CompiledQuery | ASTNode) -> Sequence[Sequence[Any]]:
         """
         Executes a query and returns all resulting rows.
         """
         compiled_query = self._compile_if_needed(query)
-        if self.connection:
-            cursor = self.connection.cursor()
-            try:
-                cursor.execute(compiled_query.sql, compiled_query.params)
-                return cast(Sequence[Sequence[Any]], cursor.fetchall())
-            finally:
-                cursor.close()
-
-        mysql_connector = self._get_mysql_connector()
-        conn = mysql_connector.connect(**self._parse_connection_info())
+        conn, should_close = self._get_connection_for_query()
         try:
             cursor = conn.cursor()
             try:
@@ -133,23 +142,15 @@ class MySqlExecutor(Executor):
             finally:
                 cursor.close()
         finally:
-            conn.close()
+            if should_close:
+                conn.close()
 
     def fetch_one(self, query: CompiledQuery | ASTNode) -> Sequence[Any] | None:
         """
         Executes a query and returns a single resulting row.
         """
         compiled_query = self._compile_if_needed(query)
-        if self.connection:
-            cursor = self.connection.cursor()
-            try:
-                cursor.execute(compiled_query.sql, compiled_query.params)
-                return cast(Sequence[Any] | None, cursor.fetchone())
-            finally:
-                cursor.close()
-
-        mysql_connector = self._get_mysql_connector()
-        conn = mysql_connector.connect(**self._parse_connection_info())
+        conn, should_close = self._get_connection_for_query()
         try:
             cursor = conn.cursor()
             try:
@@ -158,28 +159,94 @@ class MySqlExecutor(Executor):
             finally:
                 cursor.close()
         finally:
-            conn.close()
+            if should_close:
+                conn.close()
 
     def execute_raw(self, sql: str, params: Sequence[Any] | None = None) -> None:
         """
         Executes a raw SQL string.
         """
-        if self.connection:
-            cursor = self.connection.cursor()
-            try:
-                cursor.execute(sql, params or [])
-            finally:
-                cursor.close()
-            return
-
-        mysql_connector = self._get_mysql_connector()
-        conn = mysql_connector.connect(**self._parse_connection_info())
+        conn, should_close = self._get_connection_for_query()
         try:
             cursor = conn.cursor()
             try:
                 cursor.execute(sql, params or [])
-                conn.commit()
+                if should_close:
+                    conn.commit()
             finally:
                 cursor.close()
         finally:
-            conn.close()
+            if should_close:
+                conn.close()
+
+    def begin(self, isolation_level: str | None = None) -> None:
+        if self._has_active_transaction():
+            raise RuntimeError("Transaction already active.")
+
+        if self.connection is not None:
+            self._transaction_connection = self.connection
+            self._owns_transaction_connection = False
+        else:
+            mysql_connector = self._get_mysql_connector()
+            self._transaction_connection = mysql_connector.connect(**self._parse_connection_info())
+            self._owns_transaction_connection = True
+
+        if isolation_level:
+            cursor = self._transaction_connection.cursor()
+            try:
+                cursor.execute(f"SET TRANSACTION ISOLATION LEVEL {isolation_level}")
+            finally:
+                cursor.close()
+
+        if hasattr(self._transaction_connection, "start_transaction"):
+            self._transaction_connection.start_transaction()
+        else:
+            cursor = self._transaction_connection.cursor()
+            try:
+                cursor.execute("START TRANSACTION")
+            finally:
+                cursor.close()
+
+    def commit(self) -> None:
+        conn = self._require_active_transaction_connection()
+        try:
+            conn.commit()
+        finally:
+            if self._owns_transaction_connection:
+                conn.close()
+            self._transaction_connection = None
+            self._owns_transaction_connection = False
+
+    def rollback(self) -> None:
+        conn = self._require_active_transaction_connection()
+        try:
+            conn.rollback()
+        finally:
+            if self._owns_transaction_connection:
+                conn.close()
+            self._transaction_connection = None
+            self._owns_transaction_connection = False
+
+    def savepoint(self, name: str) -> None:
+        conn = self._require_active_transaction_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SAVEPOINT {name}")
+        finally:
+            cursor.close()
+
+    def rollback_to_savepoint(self, name: str) -> None:
+        conn = self._require_active_transaction_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"ROLLBACK TO SAVEPOINT {name}")
+        finally:
+            cursor.close()
+
+    def release_savepoint(self, name: str) -> None:
+        conn = self._require_active_transaction_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"RELEASE SAVEPOINT {name}")
+        finally:
+            cursor.close()

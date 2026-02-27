@@ -31,3 +31,45 @@ class Executor(ABC):
         Executes a query and returns a single resulting row.
         """
         pass
+
+    @abstractmethod
+    def begin(self, isolation_level: str | None = None) -> None:
+        """
+        Begins an explicit transaction.
+        """
+        pass
+
+    @abstractmethod
+    def commit(self) -> None:
+        """
+        Commits the active explicit transaction.
+        """
+        pass
+
+    @abstractmethod
+    def rollback(self) -> None:
+        """
+        Rolls back the active explicit transaction.
+        """
+        pass
+
+    @abstractmethod
+    def savepoint(self, name: str) -> None:
+        """
+        Creates a savepoint in the active explicit transaction.
+        """
+        pass
+
+    @abstractmethod
+    def rollback_to_savepoint(self, name: str) -> None:
+        """
+        Rolls back to a savepoint in the active explicit transaction.
+        """
+        pass
+
+    @abstractmethod
+    def release_savepoint(self, name: str) -> None:
+        """
+        Releases a savepoint in the active explicit transaction.
+        """
+        pass

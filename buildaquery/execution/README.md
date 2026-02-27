@@ -11,6 +11,12 @@ An abstract base class that defines the interface for all database executors.
 - `execute(compiled_query)`: Runs a query without expecting a return value.
 - `fetch_all(compiled_query)`: Returns all rows matching the query.
 - `fetch_one(compiled_query)`: Returns the first row matching the query.
+- `begin(isolation_level=None)`: Starts an explicit transaction.
+- `commit()`: Commits the active explicit transaction.
+- `rollback()`: Rolls back the active explicit transaction.
+- `savepoint(name)`: Creates a savepoint in the active transaction.
+- `rollback_to_savepoint(name)`: Rolls back to a savepoint.
+- `release_savepoint(name)`: Releases a savepoint when supported by the dialect.
 
 ### `PostgresExecutor`
 A concrete implementation for PostgreSQL using the `psycopg` library. It handles connection management and query parametrization automatically.
@@ -52,6 +58,14 @@ executor = PostgresExecutor("dbname=test user=postgres password=secret")
 rows = executor.fetch_all(compiled)
 for row in rows:
     print(row)
+
+# 4. Explicit transaction control
+executor.begin()
+executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Alice"]))
+executor.savepoint("after_alice")
+executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Bob"]))
+executor.rollback_to_savepoint("after_alice")
+executor.commit()
 ```
 
 ### Oracle Example

@@ -104,7 +104,7 @@ Handles database connections and query execution.
 - **OracleExecutor**: Manages Oracle connections via oracledb
 - **MsSqlExecutor**: Manages SQL Server connections via pyodbc
 - **Connection Management**: Supports both connection strings and existing connections
-- **Methods**: `execute()`, `fetch_all()`, `fetch_one()`, `execute_raw()`
+- **Methods**: `execute()`, `fetch_all()`, `fetch_one()`, `execute_raw()`, `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, `release_savepoint()`
 
 #### 4. **Traversal Module** (`buildaquery/traversal/`)
 
@@ -1848,6 +1848,41 @@ query = SelectStatementNode(
 results = executor.execute(query)
 ```
 
+### Example 11: Transaction with Savepoint
+
+```python
+from buildaquery.execution.postgres import PostgresExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    InsertStatementNode, SelectStatementNode, TableNode, ColumnNode, LiteralNode, StarNode
+)
+
+executor = PostgresExecutor(connection_info="postgresql://postgres:password@127.0.0.1:5432/mydb")
+users = TableNode(name="users")
+
+executor.begin()
+executor.execute(
+    InsertStatementNode(
+        table=users,
+        columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+        values=[LiteralNode(value=1), LiteralNode(value="Alice")]
+    )
+)
+executor.savepoint("after_alice")
+executor.execute(
+    InsertStatementNode(
+        table=users,
+        columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+        values=[LiteralNode(value=2), LiteralNode(value="Bob")]
+    )
+)
+executor.rollback_to_savepoint("after_alice")
+executor.release_savepoint("after_alice")
+executor.commit()
+
+rows = executor.execute(SelectStatementNode(select_list=[StarNode()], from_table=users))
+print(rows)  # Bob insert is rolled back, Alice remains.
+```
+
 ---
 
 ## Advanced Topics
@@ -1972,6 +2007,7 @@ poetry run pytest tests
 SQLite integration tests run against the file-based database at `static/test-sqlite/db.sqlite`.
 Oracle integration tests run against the Dockerized Oracle XE container (startup may take a couple of minutes).
 CockroachDB integration tests use the SQL port `26258` by default (see `tests/README.md` for the full URL and override env var).
+Some integration tests may be skipped when the target backend service or driver is unavailable in the current environment.
 
 **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 
