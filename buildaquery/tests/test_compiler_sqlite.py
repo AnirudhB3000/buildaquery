@@ -8,7 +8,7 @@ from buildaquery.abstract_syntax_tree.models import (
     InNode, BetweenNode, InsertStatementNode, UpdateStatementNode,
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
-    CreateStatementNode, DropStatementNode
+    CreateStatementNode, DropStatementNode, LockClauseNode
 )
 
 @pytest.fixture
@@ -337,3 +337,15 @@ def test_compile_group_by_having(compiler):
     assert "GROUP BY dept" in compiled.sql
     assert "HAVING (COUNT(*) > ?)" in compiled.sql
     assert compiled.params == [5]
+
+def test_compile_lock_clause_not_supported(compiler):
+    query = SelectStatementNode(
+        select_list=[StarNode()],
+        from_table=TableNode(name="jobs"),
+        lock_clause=LockClauseNode(mode="UPDATE"),
+    )
+    with pytest.raises(
+        ValueError,
+        match="SQLite does not support FOR UPDATE/FOR SHARE row-lock clauses",
+    ):
+        compiler.compile(query)

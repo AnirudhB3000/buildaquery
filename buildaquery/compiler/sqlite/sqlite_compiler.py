@@ -33,7 +33,8 @@ from buildaquery.abstract_syntax_tree.models import (
     WhenThenNode,
     SubqueryNode,
     CTENode,
-    OverClauseNode
+    OverClauseNode,
+    LockClauseNode
 )
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.traversal.visitor_pattern import Visitor
@@ -115,6 +116,9 @@ class SqliteCompiler(Visitor):
 
         if node.top_clause:
             parts.append(f"LIMIT {node.top_clause.count}")
+
+        if node.lock_clause:
+            parts.append(self.visit(node.lock_clause))
 
         return " ".join(parts)
 
@@ -342,3 +346,7 @@ class SqliteCompiler(Visitor):
 
     def visit_OrderByClauseNode(self, node: OrderByClauseNode) -> str:
         return f"{self.visit(node.expression)} {node.direction}"
+
+    def visit_LockClauseNode(self, node: LockClauseNode) -> str:
+        _ = node
+        raise ValueError("SQLite does not support FOR UPDATE/FOR SHARE row-lock clauses.")

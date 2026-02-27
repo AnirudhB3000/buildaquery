@@ -34,6 +34,7 @@ The initial implementation supports PostgreSQL.
 - **Clause Ordering**: Ensures `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT` are placed in the correct sequence.
 - **TOP Translation**: Automatically translates `TopClauseNode` into PostgreSQL-compliant `LIMIT` and `ORDER BY` logic.
 - **Mutual Exclusivity Enforcement**: Raises a `ValueError` if a query attempts to use both `TOP` and standard `LIMIT/OFFSET`.
+- **Row Locking**: Supports `lock_clause` (`LockClauseNode`) for `FOR UPDATE`/`FOR SHARE` with optional `NOWAIT` / `SKIP LOCKED` where the dialect supports it.
 
 ### SQLite (`SqliteCompiler`)
 
@@ -44,6 +45,7 @@ The initial implementation supports PostgreSQL.
 - **Core AST Coverage**: Supports the same AST nodes as PostgreSQL where SQLite syntax allows.
 - **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQLite does not support `DROP TABLE ... CASCADE`.
+- **Row Locking**: Raises `ValueError` for `lock_clause` because SQLite does not support trailing `FOR UPDATE`/`FOR SHARE`.
 
 ### MySQL (`MySqlCompiler`)
 
@@ -53,6 +55,7 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
 - **Set Operation Limits**: Raises a `ValueError` for `INTERSECT` and `EXCEPT` (unsupported in MySQL).
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because MySQL does not support `DROP TABLE ... CASCADE`.
+- **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
 
 ### Oracle (`OracleCompiler`)
 
@@ -65,6 +68,7 @@ The initial implementation supports PostgreSQL.
   - `INTERSECT ALL` and `MINUS ALL` raise `ValueError`.
 - **Table Aliases**: Emits `table alias` (Oracle does not allow `AS` for table aliases).
 - **IF EXISTS/IF NOT EXISTS**: Raises `ValueError` for `DropStatementNode.if_exists=True` and `CreateStatementNode.if_not_exists=True`.
+- **Row Locking**: Supports `FOR UPDATE` with optional `NOWAIT` / `SKIP LOCKED`; `FOR SHARE` raises `ValueError`.
 
 ### SQL Server (`MsSqlCompiler`)
 
@@ -76,6 +80,7 @@ The initial implementation supports PostgreSQL.
   - `UNION`, `INTERSECT`, and `EXCEPT` are supported.
   - `INTERSECT ALL` and `EXCEPT ALL` raise `ValueError`.
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQL Server does not support `DROP TABLE ... CASCADE`.
+- **Row Locking**: `lock_clause` currently raises `ValueError` in this compiler (SQL Server locking uses table hints, not trailing `FOR UPDATE` syntax).
 
 ### MariaDB (`MariaDbCompiler`)
 
@@ -84,6 +89,7 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
 - **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
 - **CASCADE Handling**: Allows `DROP TABLE ... CASCADE` (treated as a no-op by MariaDB).
+- **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
 
 ### CockroachDB (`CockroachDbCompiler`)
 
@@ -92,6 +98,7 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
 - **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
 - **CASCADE Handling**: Supports `DROP TABLE ... CASCADE`.
+- **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
 
 ## Usage Example
 

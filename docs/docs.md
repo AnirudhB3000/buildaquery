@@ -519,7 +519,8 @@ SelectStatementNode(
     order_by_clause=[OrderByClauseNode(...)],
     top_clause=None,
     limit=None,
-    offset=None
+    offset=None,
+    lock_clause=None  # Optional row lock modifier
 )
 ```
 
@@ -536,6 +537,33 @@ TopClauseNode(
 ```
 
 Note: In the PostgreSQL, SQLite, and MySQL compilers, `TOP` is translated into `LIMIT` (and may inject an `ORDER BY` if needed). In the Oracle compiler, `TOP` is translated into `FETCH FIRST ... ROWS ONLY`.
+
+#### `LockClauseNode`
+
+Represents row-level locking modifiers for `SELECT` statements.
+
+```python
+LockClauseNode(
+    mode="UPDATE",   # UPDATE or SHARE
+    nowait=False,    # Optional NOWAIT
+    skip_locked=True # Optional SKIP LOCKED
+)
+```
+
+Example usage:
+
+```python
+SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=TableNode(name="jobs"),
+    lock_clause=LockClauseNode(mode="UPDATE", skip_locked=True)
+)
+```
+
+Dialect notes:
+- PostgreSQL/CockroachDB/MySQL/MariaDB support lock clauses in this compiler.
+- Oracle supports `FOR UPDATE` (with optional `NOWAIT` / `SKIP LOCKED`) but not `FOR SHARE`.
+- SQL Server and SQLite compilers raise `ValueError` for `lock_clause`.
 
 #### `CTENode`
 

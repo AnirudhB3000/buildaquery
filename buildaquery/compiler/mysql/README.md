@@ -9,6 +9,7 @@ The `MySqlCompiler` translates the AST into MySQL-compatible SQL with `%s` place
 - **Unsupported Operations**:
   - `INTERSECT` and `EXCEPT` raise `ValueError` (MySQL does not support them).
   - `DROP TABLE ... CASCADE` raises `ValueError`.
+- **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
 
 ## Example
 

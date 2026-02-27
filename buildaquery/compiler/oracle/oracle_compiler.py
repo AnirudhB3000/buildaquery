@@ -34,7 +34,8 @@ from buildaquery.abstract_syntax_tree.models import (
     WhenThenNode,
     SubqueryNode,
     CTENode,
-    OverClauseNode
+    OverClauseNode,
+    LockClauseNode
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -116,6 +117,9 @@ class OracleCompiler(Visitor):
 
         if node.top_clause:
             parts.append(f"FETCH FIRST {node.top_clause.count} ROWS ONLY")
+
+        if node.lock_clause:
+            parts.append(self.visit(node.lock_clause))
 
         return " ".join(parts)
 
@@ -346,3 +350,17 @@ class OracleCompiler(Visitor):
 
     def visit_OrderByClauseNode(self, node: OrderByClauseNode) -> str:
         return f"{self.visit(node.expression)} {node.direction}"
+
+    def visit_LockClauseNode(self, node: LockClauseNode) -> str:
+        mode = node.mode.strip().upper()
+        if mode != "UPDATE":
+            raise ValueError("Oracle only supports lock mode 'UPDATE'.")
+        if node.nowait and node.skip_locked:
+            raise ValueError("NOWAIT and SKIP LOCKED are mutually exclusive.")
+
+        parts = ["FOR UPDATE"]
+        if node.nowait:
+            parts.append("NOWAIT")
+        if node.skip_locked:
+            parts.append("SKIP LOCKED")
+        return " ".join(parts)

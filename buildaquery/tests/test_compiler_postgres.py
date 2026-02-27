@@ -8,7 +8,7 @@ from buildaquery.abstract_syntax_tree.models import (
     InNode, BetweenNode, InsertStatementNode, UpdateStatementNode,
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
-    CreateStatementNode, DropStatementNode
+    CreateStatementNode, DropStatementNode, LockClauseNode
 )
 
 @pytest.fixture
@@ -341,3 +341,21 @@ def test_compile_group_by_having(compiler):
     assert "GROUP BY dept" in compiled.sql
     assert "HAVING (COUNT(*) > %s)" in compiled.sql
     assert compiled.params == [5]
+
+def test_compile_select_with_lock_clause(compiler):
+    query = SelectStatementNode(
+        select_list=[StarNode()],
+        from_table=TableNode(name="jobs"),
+        lock_clause=LockClauseNode(mode="UPDATE", nowait=True),
+    )
+    compiled = compiler.compile(query)
+    assert compiled.sql == "SELECT * FROM jobs FOR UPDATE NOWAIT"
+
+def test_compile_lock_clause_conflict_error(compiler):
+    query = SelectStatementNode(
+        select_list=[StarNode()],
+        from_table=TableNode(name="jobs"),
+        lock_clause=LockClauseNode(mode="SHARE", nowait=True, skip_locked=True),
+    )
+    with pytest.raises(ValueError, match="NOWAIT and SKIP LOCKED are mutually exclusive"):
+        compiler.compile(query)

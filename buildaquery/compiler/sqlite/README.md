@@ -12,3 +12,4 @@ The SQLite compiler translates the AST into SQLite-compatible SQL.
 - Supports `WITH`, set operations, and window functions (requires SQLite 3.25+ for window functions).
 - `TOP` is translated to `LIMIT`.
 - `DROP TABLE ... CASCADE` is not supported by SQLite; the compiler raises a `ValueError` if `cascade=True`.
+- `lock_clause` is not supported in the SQLite compiler; it raises `ValueError` for row-lock clauses.

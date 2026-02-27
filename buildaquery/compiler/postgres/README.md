@@ -22,6 +22,7 @@ This sub-module provides the concrete implementation of the SQL compiler for Pos
 - **Dialect Specifics**: 
     - Translates `TopClauseNode` into a combination of `LIMIT` and `ORDER BY`.
     - Handles PostgreSQL-specific operator precedence through grouping.
+    - Supports `lock_clause` (`LockClauseNode`) for `FOR UPDATE` / `FOR SHARE` with optional `NOWAIT` / `SKIP LOCKED`.
 
 ## Implementation Details
 

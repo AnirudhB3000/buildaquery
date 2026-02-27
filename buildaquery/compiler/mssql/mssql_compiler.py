@@ -34,7 +34,8 @@ from buildaquery.abstract_syntax_tree.models import (
     WhenThenNode,
     SubqueryNode,
     CTENode,
-    OverClauseNode
+    OverClauseNode,
+    LockClauseNode
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -119,6 +120,9 @@ class MsSqlCompiler(Visitor):
             parts.append(f"OFFSET {offset} ROWS")
             if node.limit is not None:
                 parts.append(f"FETCH NEXT {node.limit} ROWS ONLY")
+
+        if node.lock_clause:
+            parts.append(self.visit(node.lock_clause))
 
         return " ".join(parts)
 
@@ -356,3 +360,9 @@ class MsSqlCompiler(Visitor):
 
     def visit_OrderByClauseNode(self, node: OrderByClauseNode) -> str:
         return f"{self.visit(node.expression)} {node.direction}"
+
+    def visit_LockClauseNode(self, node: LockClauseNode) -> str:
+        _ = node
+        raise ValueError(
+            "SQL Server does not support trailing FOR UPDATE/FOR SHARE lock clauses in this compiler."
+        )

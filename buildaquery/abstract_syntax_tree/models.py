@@ -102,6 +102,15 @@ class TopClauseNode(ASTNode):
     direction: str = "DESC" # default to descending order for TOP
 
 @dataclass
+class LockClauseNode(ASTNode):
+    """
+    Represents row-level locking modifiers for SELECT statements.
+    """
+    mode: str = "UPDATE"  # UPDATE or SHARE
+    nowait: bool = False
+    skip_locked: bool = False
+
+@dataclass
 class TableNode(FromClauseNode):
     """
     Represents a table reference in the AST.
@@ -210,6 +219,7 @@ class SelectStatementNode(StatementNode):
     top_clause: TopClauseNode | None = None # optional top clause, mutually exclusive with limit and offset
     limit: int | None = None # optional limit for number of results to return
     offset: int | None = None # optional offset for skipping results
+    lock_clause: LockClauseNode | None = None # optional row-locking clause (e.g., FOR UPDATE)
 
 @dataclass
 class DeleteStatementNode(StatementNode):

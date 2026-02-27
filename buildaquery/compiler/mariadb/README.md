@@ -8,6 +8,7 @@ The `MariaDbCompiler` translates the AST into MariaDB-compatible SQL with `?` pl
 - **TOP Translation**: `TopClauseNode` is translated into `LIMIT`, with optional implicit `ORDER BY`.
 - **Set Operations**: `UNION`, `INTERSECT`, and `EXCEPT` are supported (including `ALL` variants).
 - **DROP TABLE ... CASCADE**: Accepted and passed through (MariaDB treats `CASCADE` as a no-op).
+- **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
 
 ## Example
 

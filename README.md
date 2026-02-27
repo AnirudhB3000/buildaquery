@@ -7,6 +7,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Dialect-Agnostic AST**: Build queries using high-level Python objects.
 - **Full DML Support**: Create `SELECT`, `INSERT`, `UPDATE`, and `DELETE` statements.
 - **Advanced Querying**: Support for CTEs (`WITH`), Subqueries, Set Operations (`UNION`, `INTERSECT`, `EXCEPT`), and Window Functions (`OVER`).
+- **Concurrency Controls**: Optional `lock_clause` support on `SELECT` for row locking (`FOR UPDATE`, `FOR SHARE`, `NOWAIT`, `SKIP LOCKED`) with dialect-aware behavior.
 - **Rich Expression Logic**: Includes `CASE` expressions, `IN`, `BETWEEN`, and type casting.
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.

@@ -12,6 +12,7 @@ The `MsSqlCompiler` translates the AST into SQL Server-compatible SQL with `?` p
   - `EXCEPT` is supported.
   - `INTERSECT ALL` and `EXCEPT ALL` raise `ValueError`.
 - **DROP TABLE ... CASCADE**: Not supported; raises `ValueError`.
+- **Row Locking**: `lock_clause` currently raises `ValueError` in this compiler because SQL Server locking typically uses table hints (`WITH (...)`) instead of trailing `FOR UPDATE` syntax.
 
 ## Example
 
