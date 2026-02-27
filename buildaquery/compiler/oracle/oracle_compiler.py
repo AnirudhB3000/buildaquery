@@ -148,6 +148,8 @@ class OracleCompiler(Visitor):
         Compiles an INSERT statement.
         """
         if node.upsert_clause:
+            if node.rows is not None:
+                raise ValueError("Oracle MERGE upsert does not support multi-row rows payload yet.")
             return self._compile_merge_upsert(node)
         if node.returning_clause:
             raise ValueError("Oracle RETURNING requires INTO/out-binds and is not yet supported.")
@@ -157,8 +159,38 @@ class OracleCompiler(Visitor):
         if node.columns:
             cols = f" ({', '.join([c.name for c in node.columns])})"
 
-        vals = ", ".join([self.visit(v) for v in node.values])
-        return f"INSERT INTO {table}{cols} VALUES ({vals})"
+        values_sql = self._compile_insert_values(node, table, cols)
+        if values_sql.startswith("ALL "):
+            return f"INSERT {values_sql}"
+        return f"INSERT INTO {table}{cols} {values_sql}"
+
+    def _compile_insert_values(self, node: InsertStatementNode, table: str, cols: str) -> str:
+        has_values = node.values is not None
+        has_rows = node.rows is not None
+        if has_values == has_rows:
+            raise ValueError("Insert must provide exactly one of values or rows.")
+
+        if node.values is not None:
+            if node.columns and len(node.columns) != len(node.values):
+                raise ValueError("Insert columns and values must have the same length.")
+            vals = ", ".join([self.visit(v) for v in node.values])
+            return f"VALUES ({vals})"
+
+        assert node.rows is not None
+        if not node.rows:
+            raise ValueError("Insert rows must include at least one row.")
+        expected = len(node.rows[0])
+        if expected == 0:
+            raise ValueError("Insert rows cannot be empty.")
+        if node.columns and len(node.columns) != expected:
+            raise ValueError("Insert columns and row values must have the same length.")
+        into_parts: list[str] = []
+        for row in node.rows:
+            if len(row) != expected:
+                raise ValueError("All insert rows must have the same number of values.")
+            row_vals = ", ".join([self.visit(v) for v in row])
+            into_parts.append(f"INTO {table}{cols} VALUES ({row_vals})")
+        return f"ALL {' '.join(into_parts)} SELECT 1 FROM dual"
 
     def _compile_merge_upsert(self, node: InsertStatementNode) -> str:
         clause = node.upsert_clause
@@ -190,6 +222,8 @@ class OracleCompiler(Visitor):
     def _compile_merge_source(self, node: InsertStatementNode) -> str:
         if node.columns is None:
             raise ValueError("Oracle MERGE upsert requires insert columns.")
+        if node.values is None:
+            raise ValueError("Oracle MERGE upsert requires single-row values payload.")
         if len(node.columns) != len(node.values):
             raise ValueError("Insert columns and values must have the same length.")
 

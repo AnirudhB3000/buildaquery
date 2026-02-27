@@ -3,6 +3,7 @@
 This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases and a SQLite database file.
 It also includes cross-dialect transaction and upsert behavior validation suites.
 It also includes cross-dialect write-return payload validation (`RETURNING`/`OUTPUT`).
+It also includes cross-dialect batch write validation (multi-row insert AST and executor `execute_many`).
 
 ## Strategy
 
@@ -74,6 +75,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **Transaction Integration Test**: Create `tests/test_transaction_integration.py` for cross-dialect transaction APIs.
 - [x] **Upsert Integration Test**: Create `tests/test_upsert_integration.py` for `ON CONFLICT`/`ON DUPLICATE KEY UPDATE` behavior.
 - [x] **Write-Return Integration Test**: Create `tests/test_returning_integration.py` for `RETURNING`/`OUTPUT` behavior.
+- [x] **Batch Write Integration Test**: Create `tests/test_batch_write_integration.py` for multi-row insert and `execute_many` behavior.
 
 ## How to Run
 

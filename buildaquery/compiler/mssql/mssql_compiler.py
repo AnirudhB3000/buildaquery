@@ -153,6 +153,8 @@ class MsSqlCompiler(Visitor):
         if node.upsert_clause:
             if node.returning_clause:
                 raise ValueError("SQL Server upsert MERGE path does not support returning_clause yet.")
+            if node.rows is not None:
+                raise ValueError("SQL Server MERGE upsert does not support multi-row rows payload yet.")
             return self._compile_merge_upsert(node)
 
         table = self.visit(node.table)
@@ -160,12 +162,39 @@ class MsSqlCompiler(Visitor):
         if node.columns:
             cols = f" ({', '.join([c.name for c in node.columns])})"
 
-        vals = ", ".join([self.visit(v) for v in node.values])
+        values_sql = self._compile_insert_values(node)
         sql = f"INSERT INTO {table}{cols}"
         if node.returning_clause:
             sql += f" {self._compile_output_clause('INSERT', node.returning_clause)}"
-        sql += f" VALUES ({vals})"
+        sql += f" {values_sql}"
         return sql
+
+    def _compile_insert_values(self, node: InsertStatementNode) -> str:
+        has_values = node.values is not None
+        has_rows = node.rows is not None
+        if has_values == has_rows:
+            raise ValueError("Insert must provide exactly one of values or rows.")
+
+        if node.values is not None:
+            if node.columns and len(node.columns) != len(node.values):
+                raise ValueError("Insert columns and values must have the same length.")
+            vals = ", ".join([self.visit(v) for v in node.values])
+            return f"VALUES ({vals})"
+
+        assert node.rows is not None
+        if not node.rows:
+            raise ValueError("Insert rows must include at least one row.")
+        expected = len(node.rows[0])
+        if expected == 0:
+            raise ValueError("Insert rows cannot be empty.")
+        if node.columns and len(node.columns) != expected:
+            raise ValueError("Insert columns and row values must have the same length.")
+        row_sql: list[str] = []
+        for row in node.rows:
+            if len(row) != expected:
+                raise ValueError("All insert rows must have the same number of values.")
+            row_sql.append(f"({', '.join([self.visit(v) for v in row])})")
+        return f"VALUES {', '.join(row_sql)}"
 
     def _compile_merge_upsert(self, node: InsertStatementNode) -> str:
         clause = node.upsert_clause
@@ -197,6 +226,8 @@ class MsSqlCompiler(Visitor):
     def _compile_merge_source(self, node: InsertStatementNode) -> str:
         if node.columns is None:
             raise ValueError("SQL Server MERGE upsert requires insert columns.")
+        if node.values is None:
+            raise ValueError("SQL Server MERGE upsert requires single-row values payload.")
         if len(node.columns) != len(node.values):
             raise ValueError("Insert columns and values must have the same length.")
 

@@ -42,6 +42,24 @@ def test_oracle_executor_execute(mock_oracledb):
     mock_cursor.close.assert_called_once()
     mock_conn.close.assert_called_once()
 
+def test_oracle_executor_execute_many(mock_oracledb):
+    executor = OracleExecutor(connection_info="oracle://user:pass@localhost:1521/XEPDB1")
+    mock_conn = mock_oracledb.connect.return_value
+    mock_cursor = mock_conn.cursor.return_value
+
+    executor.execute_many(
+        "INSERT INTO t(id, value) VALUES (:1, :2)",
+        [[1, "a"], [2, "b"]],
+    )
+
+    mock_cursor.executemany.assert_called_once_with(
+        "INSERT INTO t(id, value) VALUES (:1, :2)",
+        [[1, "a"], [2, "b"]],
+    )
+    mock_conn.commit.assert_called_once()
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
+
 def test_oracle_executor_import_error():
     executor = OracleExecutor(connection_info="oracle://user:pass@localhost:1521/XEPDB1")
 

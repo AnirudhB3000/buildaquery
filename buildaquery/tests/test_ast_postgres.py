@@ -1,6 +1,6 @@
 from buildaquery.abstract_syntax_tree.models import (
     ColumnNode, TableNode, LiteralNode, BinaryOperationNode, 
-    SelectStatementNode, TopClauseNode, StarNode
+    SelectStatementNode, TopClauseNode, StarNode, InsertStatementNode
 )
 
 def test_column_node_init():
@@ -38,3 +38,14 @@ def test_select_statement_node_init():
     assert node.select_list == select_list
     assert node.from_table == from_table
     assert node.where_clause is None
+
+
+def test_insert_statement_node_rows_init():
+    node = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+        rows=[[LiteralNode(value=1), LiteralNode(value="alice")]],
+    )
+    assert node.values is None
+    assert node.rows is not None
+    assert len(node.rows) == 1

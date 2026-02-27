@@ -16,6 +16,21 @@ def test_sqlite_executor_execute_and_fetch():
     conn.close()
 
 
+def test_sqlite_executor_execute_many():
+    conn = sqlite3.connect(":memory:")
+    executor = SqliteExecutor(connection=conn)
+    executor.execute_raw("CREATE TABLE t_many (id INTEGER PRIMARY KEY, value TEXT)")
+
+    executor.execute_many(
+        "INSERT INTO t_many (id, value) VALUES (?, ?)",
+        [[1, "a"], [2, "b"]],
+    )
+
+    rows = executor.fetch_all(CompiledQuery(sql="SELECT id, value FROM t_many ORDER BY id", params=[]))
+    assert rows == [(1, "a"), (2, "b")]
+    conn.close()
+
+
 def test_sqlite_transaction_lifecycle_with_owned_connection():
     conn = sqlite3.connect(":memory:")
     executor = SqliteExecutor(connection=conn)

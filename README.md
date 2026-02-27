@@ -10,6 +10,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Concurrency Controls**: Optional `lock_clause` support on `SELECT` for row locking (`FOR UPDATE`, `FOR SHARE`, `NOWAIT`, `SKIP LOCKED`) with dialect-aware behavior.
 - **Dialect-Aware Upsert**: `InsertStatementNode.upsert_clause` supports conflict handling across dialects (`ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, and `MERGE`-based paths).
 - **Write-Return Payloads**: `returning_clause` on `INSERT`/`UPDATE`/`DELETE` supports `RETURNING` and SQL Server `OUTPUT` equivalents.
+- **Batch Writes**: `InsertStatementNode.rows` supports multi-row insert payloads, and executors expose `execute_many(...)` for driver-level bulk execution.
 - **Rich Expression Logic**: Includes `CASE` expressions, `IN`, `BETWEEN`, and type casting.
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
@@ -33,7 +34,11 @@ A Python-based query builder designed to represent, compile, and execute SQL que
   - MariaDB: `RETURNING ...` on `INSERT`/`DELETE` (not `UPDATE` in this compiler).
   - SQL Server: `OUTPUT INSERTED...` / `OUTPUT DELETED...` compiled from `returning_clause`.
   - MySQL: generic `RETURNING` payloads are not supported in this compiler.
-  - Oracle: `RETURNING ... INTO` requires out-bind plumbing and is not yet supported.
+- Oracle: `RETURNING ... INTO` requires out-bind plumbing and is not yet supported.
+- Batch insert behavior:
+  - All dialect compilers support multi-row insert payloads through `InsertStatementNode.rows`.
+  - Oracle compiles multi-row inserts via `INSERT ALL ... SELECT 1 FROM dual`.
+  - SQL Server and Oracle `MERGE` upsert paths currently require single-row `values` (not `rows`).
 
 ## Installation
 
@@ -426,6 +431,7 @@ For more examples, see the `examples/` directory (including `examples/sample_mys
 For transaction control, see `examples/sample_transactions.py`.
 For upsert patterns, see `examples/sample_upsert.py`.
 For write-return payloads, see `examples/sample_returning.py`.
+For batch writes, see `examples/sample_batch_write.py`.
 
 ## Development Setup
 

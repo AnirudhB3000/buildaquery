@@ -11,6 +11,7 @@ An abstract base class that defines the interface for all database executors.
 - `execute(compiled_query)`: Runs a query without expecting a return value.
 - `fetch_all(compiled_query)`: Returns all rows matching the query.
 - `fetch_one(compiled_query)`: Returns the first row matching the query.
+- `execute_many(sql, param_sets)`: Runs one SQL statement against multiple parameter sets (bulk write path).
 - `begin(isolation_level=None)`: Starts an explicit transaction.
 - `commit()`: Commits the active explicit transaction.
 - `rollback()`: Rolls back the active explicit transaction.
@@ -66,6 +67,12 @@ executor.savepoint("after_alice")
 executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Bob"]))
 executor.rollback_to_savepoint("after_alice")
 executor.commit()
+
+# 5. Driver-level bulk writes
+executor.execute_many(
+    "INSERT INTO users(name) VALUES (%s)",
+    [["Carol"], ["Dave"]],
+)
 ```
 
 ### Oracle Example

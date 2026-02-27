@@ -33,6 +33,13 @@ class Executor(ABC):
         pass
 
     @abstractmethod
+    def execute_many(self, sql: str, param_sets: Sequence[Sequence[Any]]) -> None:
+        """
+        Executes a SQL statement against multiple parameter sets.
+        """
+        pass
+
+    @abstractmethod
     def begin(self, isolation_level: str | None = None) -> None:
         """
         Begins an explicit transaction.

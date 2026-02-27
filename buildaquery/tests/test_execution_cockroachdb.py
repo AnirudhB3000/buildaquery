@@ -38,6 +38,22 @@ def test_cockroach_executor_execute(mock_psycopg):
     mock_cur.execute.assert_called_once_with("INSERT INTO t VALUES (%s)", [10])
     mock_conn.close.assert_called_once()
 
+def test_cockroach_executor_execute_many(mock_psycopg):
+    executor = CockroachExecutor(connection_info="dsn")
+    mock_conn = mock_psycopg.connect.return_value
+    mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+
+    executor.execute_many(
+        "INSERT INTO t(id, value) VALUES (%s, %s)",
+        [[1, "a"], [2, "b"]],
+    )
+
+    mock_cur.executemany.assert_called_once_with(
+        "INSERT INTO t(id, value) VALUES (%s, %s)",
+        [[1, "a"], [2, "b"]],
+    )
+    mock_conn.close.assert_called_once()
+
 def test_cockroach_transaction_lifecycle_connection_info(mock_psycopg):
     executor = CockroachExecutor(connection_info="dsn")
     mock_conn = mock_psycopg.connect.return_value

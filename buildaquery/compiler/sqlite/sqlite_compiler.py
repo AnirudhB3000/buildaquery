@@ -151,13 +151,40 @@ class SqliteCompiler(Visitor):
         if node.columns:
             cols = f" ({', '.join([c.name for c in node.columns])})"
 
-        vals = ", ".join([self.visit(v) for v in node.values])
-        sql = f"INSERT INTO {table}{cols} VALUES ({vals})"
+        values_sql = self._compile_insert_values(node)
+        sql = f"INSERT INTO {table}{cols} {values_sql}"
         if node.upsert_clause:
             sql += f" {self._compile_upsert_clause(node.upsert_clause)}"
         if node.returning_clause:
             sql += f" {self._compile_returning_clause(node.returning_clause)}"
         return sql
+
+    def _compile_insert_values(self, node: InsertStatementNode) -> str:
+        has_values = node.values is not None
+        has_rows = node.rows is not None
+        if has_values == has_rows:
+            raise ValueError("Insert must provide exactly one of values or rows.")
+
+        if node.values is not None:
+            if node.columns and len(node.columns) != len(node.values):
+                raise ValueError("Insert columns and values must have the same length.")
+            vals = ", ".join([self.visit(v) for v in node.values])
+            return f"VALUES ({vals})"
+
+        assert node.rows is not None
+        if not node.rows:
+            raise ValueError("Insert rows must include at least one row.")
+        expected = len(node.rows[0])
+        if expected == 0:
+            raise ValueError("Insert rows cannot be empty.")
+        if node.columns and len(node.columns) != expected:
+            raise ValueError("Insert columns and row values must have the same length.")
+        row_sql: list[str] = []
+        for row in node.rows:
+            if len(row) != expected:
+                raise ValueError("All insert rows must have the same number of values.")
+            row_sql.append(f"({', '.join([self.visit(v) for v in row])})")
+        return f"VALUES {', '.join(row_sql)}"
 
     def _compile_upsert_clause(self, clause: UpsertClauseNode) -> str:
         if clause.do_nothing and clause.update_columns:

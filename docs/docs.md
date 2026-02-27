@@ -121,6 +121,26 @@ query = InsertStatementNode(
 )
 ```
 
+### BATCH INSERT
+
+```python
+from buildaquery.abstract_syntax_tree.models import (
+    InsertStatementNode,
+    TableNode,
+    ColumnNode,
+    LiteralNode,
+)
+
+query = InsertStatementNode(
+    table=TableNode(name="users"),
+    columns=[ColumnNode(name="id"), ColumnNode(name="email")],
+    rows=[
+        [LiteralNode(value=1), LiteralNode(value="a@example.com")],
+        [LiteralNode(value=2), LiteralNode(value="b@example.com")],
+    ],
+)
+```
+
 ### UPSERT / CONFLICT HANDLING
 
 ```python
@@ -228,7 +248,12 @@ query = DeleteStatementNode(
   - MariaDB compiles `returning_clause` as `RETURNING` for `INSERT` and `DELETE` (not `UPDATE`).
   - SQL Server compiles `returning_clause` as `OUTPUT INSERTED...` / `OUTPUT DELETED...`.
   - MySQL generic `RETURNING` payloads are not supported.
-  - Oracle `RETURNING ... INTO` is not yet supported.
+- Oracle `RETURNING ... INTO` is not yet supported.
+- Batch write behavior:
+  - Multi-row insert payloads are represented with `InsertStatementNode.rows`.
+  - Executors also expose `execute_many(sql, param_sets)` for driver-level bulk writes.
+  - Oracle uses `INSERT ALL` for multi-row inserts.
+  - SQL Server and Oracle `MERGE` upsert paths currently support single-row `values` only.
 
 ## Testing Commands (Repo)
 

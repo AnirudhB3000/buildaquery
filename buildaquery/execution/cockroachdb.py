@@ -126,6 +126,22 @@ class CockroachExecutor(Executor):
             if should_close:
                 conn.close()
 
+    def execute_many(self, sql: str, param_sets: Sequence[Sequence[Any]]) -> None:
+        """
+        Executes a parameterized SQL statement for multiple parameter sets.
+        """
+        if not param_sets:
+            return
+        conn, should_close = self._get_connection_for_query()
+        try:
+            with conn.cursor() as cur:
+                cur.executemany(sql, param_sets)
+        finally:
+            if should_close:
+                if getattr(conn, "autocommit", False) is False:
+                    conn.commit()
+                conn.close()
+
     def execute_raw(self, sql: str, params: Sequence[Any] | None = None) -> None:
         """
         Executes a raw SQL string.

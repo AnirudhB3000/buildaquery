@@ -37,6 +37,7 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: Supports `lock_clause` (`LockClauseNode`) for `FOR UPDATE`/`FOR SHARE` with optional `NOWAIT` / `SKIP LOCKED` where the dialect supports it.
 - **Upsert/Conflict Handling**: Supports `InsertStatementNode.upsert_clause` with `ON CONFLICT` (`do_nothing`/`update_columns`).
 - **Write-Return Payloads**: Supports `returning_clause` on `INSERT`/`UPDATE`/`DELETE` via `RETURNING`.
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 
 ### SQLite (`SqliteCompiler`)
 
@@ -50,6 +51,7 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: Raises `ValueError` for `lock_clause` because SQLite does not support trailing `FOR UPDATE`/`FOR SHARE`.
 - **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
 - **Write-Return Payloads**: Supports `returning_clause` via `RETURNING` for `INSERT`/`DELETE` (rejects `UPDATE ... RETURNING`).
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 
 ### MySQL (`MySqlCompiler`)
 
@@ -62,6 +64,7 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
 - **Upsert/Conflict Handling**: Supports `ON DUPLICATE KEY UPDATE` via `upsert_clause.update_columns`. Rejects `do_nothing`.
 - **Write-Return Payloads**: Raises `ValueError` for generic `returning_clause` payloads.
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 
 ### Oracle (`OracleCompiler`)
 
@@ -77,6 +80,7 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: Supports `FOR UPDATE` with optional `NOWAIT` / `SKIP LOCKED`; `FOR SHARE` raises `ValueError`.
 - **Upsert/Conflict Handling**: Uses `MERGE` generation when `InsertStatementNode.upsert_clause` is provided.
 - **Write-Return Payloads**: Oracle `RETURNING ... INTO` requires out binds and currently raises `ValueError`.
+- **Batch Inserts**: Supports multi-row inserts via `INSERT ALL ... SELECT 1 FROM dual`.
 
 ### SQL Server (`MsSqlCompiler`)
 
@@ -91,6 +95,8 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: `lock_clause` currently raises `ValueError` in this compiler (SQL Server locking uses table hints, not trailing `FOR UPDATE` syntax).
 - **Upsert/Conflict Handling**: Uses `MERGE` generation when `InsertStatementNode.upsert_clause` is provided.
 - **Write-Return Payloads**: Supports `returning_clause` via SQL Server `OUTPUT` (`INSERTED`/`DELETED`) for direct `INSERT`/`UPDATE`/`DELETE`.
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows` for direct inserts.
+- **MERGE Limits**: SQL Server `MERGE` upsert path currently requires single-row `values` payloads.
 
 ### MariaDB (`MariaDbCompiler`)
 
@@ -102,6 +108,7 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
 - **Upsert/Conflict Handling**: Supports `ON DUPLICATE KEY UPDATE` via `upsert_clause.update_columns`. Rejects `do_nothing`.
 - **Write-Return Payloads**: Supports `returning_clause` via `RETURNING`.
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 
 ### CockroachDB (`CockroachDbCompiler`)
 
@@ -113,6 +120,7 @@ The initial implementation supports PostgreSQL.
 - **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
 - **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
 - **Write-Return Payloads**: Supports `returning_clause` via `RETURNING`.
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 
 ## Usage Example
 

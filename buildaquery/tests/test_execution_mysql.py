@@ -42,6 +42,24 @@ def test_mysql_executor_execute(mock_mysql_connector):
     mock_cursor.close.assert_called_once()
     mock_conn.close.assert_called_once()
 
+def test_mysql_executor_execute_many(mock_mysql_connector):
+    executor = MySqlExecutor(connection_info="mysql://user:pass@localhost:3306/db")
+    mock_conn = mock_mysql_connector.connect.return_value
+    mock_cursor = mock_conn.cursor.return_value
+
+    executor.execute_many(
+        "INSERT INTO t(id, value) VALUES (%s, %s)",
+        [[1, "a"], [2, "b"]],
+    )
+
+    mock_cursor.executemany.assert_called_once_with(
+        "INSERT INTO t(id, value) VALUES (%s, %s)",
+        [[1, "a"], [2, "b"]],
+    )
+    mock_conn.commit.assert_called_once()
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
+
 def test_mysql_executor_import_error():
     executor = MySqlExecutor(connection_info="mysql://user:pass@localhost:3306/db")
 

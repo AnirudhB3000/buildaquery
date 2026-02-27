@@ -282,7 +282,8 @@ class InsertStatementNode(StatementNode):
     Represents an INSERT statement in the AST.
     """
     table: TableNode
-    values: list[ExpressionNode]
+    values: list[ExpressionNode] | None = None
+    rows: list[list[ExpressionNode]] | None = None
     columns: list[ColumnNode] | None = None
     upsert_clause: UpsertClauseNode | None = None
     returning_clause: ReturningClauseNode | None = None

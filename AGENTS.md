@@ -126,6 +126,12 @@ This project aims to create a query builder for Python with support for PostgreS
         *   Oracle: explicit `ValueError` until `RETURNING ... INTO` out-bind support is added.
     *   Added comprehensive compiler unit tests and integration tests for write-return behavior (`tests/test_returning_integration.py`).
     *   Added a usage example (`examples/sample_returning.py`) and updated user/developer docs.
+*   **Batch Write Support**:
+    *   Extended `InsertStatementNode` with optional multi-row payload support via `rows`, while preserving single-row `values`.
+    *   Updated all dialect compilers to compile multi-row insert payloads with dialect-aware behavior.
+    *   Added `execute_many(sql, param_sets)` to the executor contract and implemented it across all executors.
+    *   Added compiler and executor unit tests and a cross-dialect integration suite (`tests/test_batch_write_integration.py`).
+    *   Added a usage example (`examples/sample_batch_write.py`) and updated user/developer docs.
 
 ---
 

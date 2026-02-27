@@ -42,6 +42,24 @@ def test_mariadb_executor_execute(mock_mariadb):
     mock_cursor.close.assert_called_once()
     mock_conn.close.assert_called_once()
 
+def test_mariadb_executor_execute_many(mock_mariadb):
+    executor = MariaDbExecutor(connection_info="mariadb://user:pass@localhost:3306/db")
+    mock_conn = mock_mariadb.connect.return_value
+    mock_cursor = mock_conn.cursor.return_value
+
+    executor.execute_many(
+        "INSERT INTO t(id, value) VALUES (?, ?)",
+        [[1, "a"], [2, "b"]],
+    )
+
+    mock_cursor.executemany.assert_called_once_with(
+        "INSERT INTO t(id, value) VALUES (?, ?)",
+        [[1, "a"], [2, "b"]],
+    )
+    mock_conn.commit.assert_called_once()
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
+
 def test_mariadb_executor_import_error():
     executor = MariaDbExecutor(connection_info="mariadb://user:pass@localhost:3306/db")
 
