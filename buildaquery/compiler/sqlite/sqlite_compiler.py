@@ -22,8 +22,19 @@ from buildaquery.abstract_syntax_tree.models import (
     InsertStatementNode,
     UpdateStatementNode,
     ColumnDefinitionNode,
+    PrimaryKeyConstraintNode,
+    UniqueConstraintNode,
+    ForeignKeyConstraintNode,
+    CheckConstraintNode,
     CreateStatementNode,
     DropStatementNode,
+    CreateIndexStatementNode,
+    DropIndexStatementNode,
+    AlterTableStatementNode,
+    AddColumnActionNode,
+    DropColumnActionNode,
+    AddConstraintActionNode,
+    DropConstraintActionNode,
     UnionNode,
     IntersectNode,
     ExceptNode,
@@ -236,7 +247,10 @@ class SqliteCompiler(Visitor):
         """
         if_not_exists = " IF NOT EXISTS" if node.if_not_exists else ""
         table = self.visit(node.table)
-        cols = ", ".join([self.visit(c) for c in node.columns])
+        parts = [self.visit(c) for c in node.columns]
+        if node.constraints:
+            parts.extend([self.visit(constraint) for constraint in node.constraints])
+        cols = ", ".join(parts)
         return f"CREATE TABLE{if_not_exists} {table} ({cols})"
 
     def visit_ColumnDefinitionNode(self, node: ColumnDefinitionNode) -> str:
@@ -261,6 +275,28 @@ class SqliteCompiler(Visitor):
         if_exists = " IF EXISTS" if node.if_exists else ""
         table = self.visit(node.table)
         return f"DROP TABLE{if_exists} {table}"
+
+    def visit_CreateIndexStatementNode(self, node: CreateIndexStatementNode) -> str:
+        if not node.columns:
+            raise ValueError("CREATE INDEX requires at least one column.")
+        unique = "UNIQUE " if node.unique else ""
+        if_not_exists = " IF NOT EXISTS" if node.if_not_exists else ""
+        cols = ", ".join([self.visit(column) for column in node.columns])
+        return f"CREATE {unique}INDEX{if_not_exists} {node.name} ON {self.visit(node.table)} ({cols})"
+
+    def visit_DropIndexStatementNode(self, node: DropIndexStatementNode) -> str:
+        if node.cascade:
+            raise ValueError("SQLite does not support CASCADE in DROP INDEX.")
+        if_exists = " IF EXISTS" if node.if_exists else ""
+        return f"DROP INDEX{if_exists} {node.name}"
+
+    def visit_AlterTableStatementNode(self, node: AlterTableStatementNode) -> str:
+        if not node.actions:
+            raise ValueError("ALTER TABLE requires at least one action.")
+        if len(node.actions) > 1:
+            raise ValueError("SQLite ALTER TABLE supports a single action per statement in this compiler.")
+        action_sql = self.visit(node.actions[0])
+        return f"ALTER TABLE {self.visit(node.table)} {action_sql}"
 
     def visit_UnionNode(self, node: UnionNode) -> str:
         """
@@ -418,3 +454,60 @@ class SqliteCompiler(Visitor):
     def visit_LockClauseNode(self, node: LockClauseNode) -> str:
         _ = node
         raise ValueError("SQLite does not support FOR UPDATE/FOR SHARE row-lock clauses.")
+
+    def visit_PrimaryKeyConstraintNode(self, node: PrimaryKeyConstraintNode) -> str:
+        columns = node.columns or []
+        if not columns:
+            raise ValueError("PRIMARY KEY constraint requires at least one column.")
+        cols = ", ".join([column.name for column in columns])
+        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        return f"{prefix}PRIMARY KEY ({cols})"
+
+    def visit_UniqueConstraintNode(self, node: UniqueConstraintNode) -> str:
+        columns = node.columns or []
+        if not columns:
+            raise ValueError("UNIQUE constraint requires at least one column.")
+        cols = ", ".join([column.name for column in columns])
+        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        return f"{prefix}UNIQUE ({cols})"
+
+    def visit_ForeignKeyConstraintNode(self, node: ForeignKeyConstraintNode) -> str:
+        columns = node.columns or []
+        reference_columns = node.reference_columns or []
+        if not columns or not reference_columns or node.reference_table is None:
+            raise ValueError("FOREIGN KEY constraint requires columns, reference_table, and reference_columns.")
+        if len(columns) != len(reference_columns):
+            raise ValueError("FOREIGN KEY columns and reference_columns must have the same length.")
+        cols = ", ".join([column.name for column in columns])
+        ref_cols = ", ".join([column.name for column in reference_columns])
+        parts = []
+        if node.name:
+            parts.append(f"CONSTRAINT {node.name}")
+        parts.append(f"FOREIGN KEY ({cols}) REFERENCES {self.visit(node.reference_table)} ({ref_cols})")
+        if node.on_delete:
+            parts.append(f"ON DELETE {node.on_delete}")
+        if node.on_update:
+            parts.append(f"ON UPDATE {node.on_update}")
+        return " ".join(parts)
+
+    def visit_CheckConstraintNode(self, node: CheckConstraintNode) -> str:
+        if node.condition is None:
+            raise ValueError("CHECK constraint requires a condition.")
+        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        return f"{prefix}CHECK ({self.visit(node.condition)})"
+
+    def visit_AddColumnActionNode(self, node: AddColumnActionNode) -> str:
+        return f"ADD COLUMN {self.visit(node.column)}"
+
+    def visit_DropColumnActionNode(self, node: DropColumnActionNode) -> str:
+        if node.if_exists:
+            raise ValueError("SQLite does not support IF EXISTS for DROP COLUMN.")
+        return f"DROP COLUMN {node.column_name}"
+
+    def visit_AddConstraintActionNode(self, node: AddConstraintActionNode) -> str:
+        _ = node
+        raise ValueError("SQLite does not support ADD CONSTRAINT via ALTER TABLE.")
+
+    def visit_DropConstraintActionNode(self, node: DropConstraintActionNode) -> str:
+        _ = node
+        raise ValueError("SQLite does not support DROP CONSTRAINT via ALTER TABLE.")

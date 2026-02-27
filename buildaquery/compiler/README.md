@@ -28,7 +28,7 @@ The initial implementation supports PostgreSQL.
 - **Specialized Expressions**: Support for `IN`, `BETWEEN`, and `CASE`.
 - **Subqueries**: Support for subqueries in `FROM` and `WHERE` clauses.
 - **Window Functions**: Support for `OVER` clauses, `PARTITION BY`, and `ORDER BY`.
-- **DDL Support**: Support for `CREATE TABLE` and `DROP TABLE`.
+- **DDL Support**: Support for table creation/drop plus table-level constraints, index statements, and alter-table action paths.
 - **Qualified Names**: Supports `schema.table` and `table.column` naming conventions.
 - **Type Casting**: Supports `CAST(expression AS type)`.
 - **Clause Ordering**: Ensures `SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, and `LIMIT` are placed in the correct sequence.
@@ -38,6 +38,7 @@ The initial implementation supports PostgreSQL.
 - **Upsert/Conflict Handling**: Supports `InsertStatementNode.upsert_clause` with `ON CONFLICT` (`do_nothing`/`update_columns`).
 - **Write-Return Payloads**: Supports `returning_clause` on `INSERT`/`UPDATE`/`DELETE` via `RETURNING`.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and `ALTER TABLE` add/drop column + add/drop constraint.
 
 ### SQLite (`SqliteCompiler`)
 
@@ -52,6 +53,7 @@ The initial implementation supports PostgreSQL.
 - **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
 - **Write-Return Payloads**: Supports `returning_clause` via `RETURNING` for `INSERT`/`DELETE` (rejects `UPDATE ... RETURNING`).
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and restricted `ALTER TABLE` actions (single-action statements; no add/drop constraint paths).
 
 ### MySQL (`MySqlCompiler`)
 
@@ -65,6 +67,7 @@ The initial implementation supports PostgreSQL.
 - **Upsert/Conflict Handling**: Supports `ON DUPLICATE KEY UPDATE` via `upsert_clause.update_columns`. Rejects `do_nothing`.
 - **Write-Return Payloads**: Raises `ValueError` for generic `returning_clause` payloads.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX` (table-qualified drop), and `ALTER TABLE` add/drop column + add constraint.
 
 ### Oracle (`OracleCompiler`)
 
@@ -81,6 +84,7 @@ The initial implementation supports PostgreSQL.
 - **Upsert/Conflict Handling**: Uses `MERGE` generation when `InsertStatementNode.upsert_clause` is provided.
 - **Write-Return Payloads**: Oracle `RETURNING ... INTO` requires out binds and currently raises `ValueError`.
 - **Batch Inserts**: Supports multi-row inserts via `INSERT ALL ... SELECT 1 FROM dual`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and restricted `ALTER TABLE` actions (single-action statements).
 
 ### SQL Server (`MsSqlCompiler`)
 
@@ -97,6 +101,7 @@ The initial implementation supports PostgreSQL.
 - **Write-Return Payloads**: Supports `returning_clause` via SQL Server `OUTPUT` (`INSERTED`/`DELETED`) for direct `INSERT`/`UPDATE`/`DELETE`.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows` for direct inserts.
 - **MERGE Limits**: SQL Server `MERGE` upsert path currently requires single-row `values` payloads.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX` (table-qualified drop), and `ALTER TABLE` add/drop column + add/drop constraint.
 
 ### MariaDB (`MariaDbCompiler`)
 
@@ -109,6 +114,7 @@ The initial implementation supports PostgreSQL.
 - **Upsert/Conflict Handling**: Supports `ON DUPLICATE KEY UPDATE` via `upsert_clause.update_columns`. Rejects `do_nothing`.
 - **Write-Return Payloads**: Supports `returning_clause` via `RETURNING`.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX` (table-qualified drop), and `ALTER TABLE` add/drop column + add constraint.
 
 ### CockroachDB (`CockroachDbCompiler`)
 
@@ -121,6 +127,7 @@ The initial implementation supports PostgreSQL.
 - **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
 - **Write-Return Payloads**: Supports `returning_clause` via `RETURNING`.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and `ALTER TABLE` add/drop column + add/drop constraint.
 
 ## Usage Example
 

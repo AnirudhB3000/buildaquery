@@ -263,10 +263,68 @@ class ColumnDefinitionNode(ASTNode):
     default: ExpressionNode | None = None
 
 @dataclass
+class TableConstraintNode(ASTNode):
+    """Base class for table-level constraints."""
+    name: str | None = None
+
+@dataclass
+class PrimaryKeyConstraintNode(TableConstraintNode):
+    """Represents a table-level PRIMARY KEY constraint."""
+    columns: list[ColumnNode] | None = None
+
+@dataclass
+class UniqueConstraintNode(TableConstraintNode):
+    """Represents a table-level UNIQUE constraint."""
+    columns: list[ColumnNode] | None = None
+
+@dataclass
+class ForeignKeyConstraintNode(TableConstraintNode):
+    """Represents a table-level FOREIGN KEY constraint."""
+    columns: list[ColumnNode] | None = None
+    reference_table: TableNode | None = None
+    reference_columns: list[ColumnNode] | None = None
+    on_delete: str | None = None
+    on_update: str | None = None
+
+@dataclass
+class CheckConstraintNode(TableConstraintNode):
+    """Represents a table-level CHECK constraint."""
+    condition: ExpressionNode | None = None
+
+@dataclass
+class AlterTableActionNode(ASTNode):
+    """Base class for ALTER TABLE actions."""
+    pass
+
+@dataclass
+class AddColumnActionNode(AlterTableActionNode):
+    """Represents ALTER TABLE ... ADD COLUMN action."""
+    column: ColumnDefinitionNode
+
+@dataclass
+class DropColumnActionNode(AlterTableActionNode):
+    """Represents ALTER TABLE ... DROP COLUMN action."""
+    column_name: str
+    if_exists: bool = False
+
+@dataclass
+class AddConstraintActionNode(AlterTableActionNode):
+    """Represents ALTER TABLE ... ADD CONSTRAINT action."""
+    constraint: TableConstraintNode
+
+@dataclass
+class DropConstraintActionNode(AlterTableActionNode):
+    """Represents ALTER TABLE ... DROP CONSTRAINT action."""
+    constraint_name: str
+    if_exists: bool = False
+    cascade: bool = False
+
+@dataclass
 class CreateStatementNode(StatementNode):
     """Represents a CREATE TABLE statement."""
     table: TableNode
     columns: list[ColumnDefinitionNode]
+    constraints: list[TableConstraintNode] | None = None
     if_not_exists: bool = False
 
 @dataclass
@@ -275,6 +333,29 @@ class DropStatementNode(StatementNode):
     table: TableNode
     if_exists: bool = False
     cascade: bool = False
+
+@dataclass
+class CreateIndexStatementNode(StatementNode):
+    """Represents a CREATE INDEX statement."""
+    name: str
+    table: TableNode
+    columns: list[ColumnNode]
+    unique: bool = False
+    if_not_exists: bool = False
+
+@dataclass
+class DropIndexStatementNode(StatementNode):
+    """Represents a DROP INDEX statement."""
+    name: str
+    table: TableNode | None = None
+    if_exists: bool = False
+    cascade: bool = False
+
+@dataclass
+class AlterTableStatementNode(StatementNode):
+    """Represents an ALTER TABLE statement with one or more actions."""
+    table: TableNode
+    actions: list[AlterTableActionNode]
 
 @dataclass
 class InsertStatementNode(StatementNode):

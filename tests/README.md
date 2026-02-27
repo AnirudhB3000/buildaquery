@@ -4,6 +4,7 @@ This directory contains integration tests that verify the full query lifecycleâ€
 It also includes cross-dialect transaction and upsert behavior validation suites.
 It also includes cross-dialect write-return payload validation (`RETURNING`/`OUTPUT`).
 It also includes cross-dialect batch write validation (multi-row insert AST and executor `execute_many`).
+It also includes cross-dialect DDL constraint/index/alter validation for OLTP schema integrity.
 
 ## Strategy
 
@@ -76,6 +77,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **Upsert Integration Test**: Create `tests/test_upsert_integration.py` for `ON CONFLICT`/`ON DUPLICATE KEY UPDATE` behavior.
 - [x] **Write-Return Integration Test**: Create `tests/test_returning_integration.py` for `RETURNING`/`OUTPUT` behavior.
 - [x] **Batch Write Integration Test**: Create `tests/test_batch_write_integration.py` for multi-row insert and `execute_many` behavior.
+- [x] **DDL Constraint Integration Test**: Create `tests/test_ddl_constraints_integration.py` for table constraints, index lifecycle, and `ALTER TABLE` paths.
 
 ## How to Run
 

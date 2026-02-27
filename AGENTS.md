@@ -132,6 +132,12 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added `execute_many(sql, param_sets)` to the executor contract and implemented it across all executors.
     *   Added compiler and executor unit tests and a cross-dialect integration suite (`tests/test_batch_write_integration.py`).
     *   Added a usage example (`examples/sample_batch_write.py`) and updated user/developer docs.
+*   **Expanded OLTP DDL Support**:
+    *   Added table-level constraint AST nodes: `PrimaryKeyConstraintNode`, `UniqueConstraintNode`, `ForeignKeyConstraintNode`, and `CheckConstraintNode`.
+    *   Added DDL statement/action nodes for index and schema evolution: `CreateIndexStatementNode`, `DropIndexStatementNode`, and `AlterTableStatementNode` with add/drop column/constraint actions.
+    *   Extended all dialect compilers to handle expanded DDL paths with explicit dialect guards for unsupported forms.
+    *   Added comprehensive unit coverage (`buildaquery/tests/test_ddl_oltp_compilers.py`) and cross-dialect integration coverage (`tests/test_ddl_constraints_integration.py`).
+    *   Added DDL usage example (`examples/sample_ddl_constraints.py`) and updated project documentation.
 
 ---
 

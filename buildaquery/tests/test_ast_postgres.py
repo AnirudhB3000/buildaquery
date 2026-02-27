@@ -1,6 +1,7 @@
 from buildaquery.abstract_syntax_tree.models import (
     ColumnNode, TableNode, LiteralNode, BinaryOperationNode, 
-    SelectStatementNode, TopClauseNode, StarNode, InsertStatementNode
+    SelectStatementNode, TopClauseNode, StarNode, InsertStatementNode,
+    ColumnDefinitionNode, CreateStatementNode, PrimaryKeyConstraintNode
 )
 
 def test_column_node_init():
@@ -49,3 +50,18 @@ def test_insert_statement_node_rows_init():
     assert node.values is None
     assert node.rows is not None
     assert len(node.rows) == 1
+
+
+def test_create_statement_node_constraints_init():
+    node = CreateStatementNode(
+        table=TableNode(name="accounts"),
+        columns=[
+            ColumnDefinitionNode(name="account_id", data_type="INTEGER"),
+            ColumnDefinitionNode(name="tenant_id", data_type="INTEGER"),
+        ],
+        constraints=[
+            PrimaryKeyConstraintNode(columns=[ColumnNode(name="account_id"), ColumnNode(name="tenant_id")])
+        ],
+    )
+    assert node.constraints is not None
+    assert len(node.constraints) == 1

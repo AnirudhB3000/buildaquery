@@ -183,6 +183,65 @@ query = InsertStatementNode(
 )
 ```
 
+### DDL CONSTRAINTS / INDEXES / ALTER TABLE
+
+```python
+from buildaquery.abstract_syntax_tree.models import (
+    AddColumnActionNode,
+    AlterTableStatementNode,
+    BinaryOperationNode,
+    CheckConstraintNode,
+    ColumnDefinitionNode,
+    ColumnNode,
+    CreateIndexStatementNode,
+    CreateStatementNode,
+    ForeignKeyConstraintNode,
+    PrimaryKeyConstraintNode,
+    TableNode,
+    UniqueConstraintNode,
+)
+
+users = TableNode(name="users")
+accounts = TableNode(name="accounts")
+
+create_accounts = CreateStatementNode(
+    table=accounts,
+    columns=[
+        ColumnDefinitionNode(name="account_id", data_type="INTEGER", not_null=True),
+        ColumnDefinitionNode(name="user_id", data_type="INTEGER", not_null=True),
+        ColumnDefinitionNode(name="balance", data_type="INTEGER", not_null=True),
+    ],
+    constraints=[
+        PrimaryKeyConstraintNode(columns=[ColumnNode(name="account_id"), ColumnNode(name="user_id")]),
+        UniqueConstraintNode(columns=[ColumnNode(name="user_id"), ColumnNode(name="account_id")]),
+        ForeignKeyConstraintNode(
+            columns=[ColumnNode(name="user_id")],
+            reference_table=users,
+            reference_columns=[ColumnNode(name="id")],
+            on_delete="CASCADE",
+        ),
+        CheckConstraintNode(
+            condition=BinaryOperationNode(
+                left=ColumnNode(name="balance"),
+                operator=">",
+                right=ColumnNode(name="user_id"),
+            )
+        ),
+    ],
+)
+
+create_idx = CreateIndexStatementNode(
+    name="idx_accounts_user_id",
+    table=accounts,
+    columns=[ColumnNode(name="user_id")],
+)
+
+alter_add_status = AlterTableStatementNode(
+    table=accounts,
+    actions=[AddColumnActionNode(column=ColumnDefinitionNode(name="status", data_type="TEXT"))],
+)
+```
+
 ### UPDATE
 
 ```python
@@ -254,6 +313,10 @@ query = DeleteStatementNode(
   - Executors also expose `execute_many(sql, param_sets)` for driver-level bulk writes.
   - Oracle uses `INSERT ALL` for multi-row inserts.
   - SQL Server and Oracle `MERGE` upsert paths currently support single-row `values` only.
+- DDL behavior:
+  - `CreateStatementNode.constraints` supports table-level `PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, and `CHECK`.
+  - `CreateIndexStatementNode` and `DropIndexStatementNode` are supported with dialect-specific `IF EXISTS`/`IF NOT EXISTS` and table-target rules.
+  - `AlterTableStatementNode` supports add/drop column and add/drop constraint actions with dialect-specific restrictions.
 
 ## Testing Commands (Repo)
 

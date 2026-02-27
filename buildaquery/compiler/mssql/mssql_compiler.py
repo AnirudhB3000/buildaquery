@@ -23,8 +23,19 @@ from buildaquery.abstract_syntax_tree.models import (
     InsertStatementNode,
     UpdateStatementNode,
     ColumnDefinitionNode,
+    PrimaryKeyConstraintNode,
+    UniqueConstraintNode,
+    ForeignKeyConstraintNode,
+    CheckConstraintNode,
     CreateStatementNode,
     DropStatementNode,
+    CreateIndexStatementNode,
+    DropIndexStatementNode,
+    AlterTableStatementNode,
+    AddColumnActionNode,
+    DropColumnActionNode,
+    AddConstraintActionNode,
+    DropConstraintActionNode,
     UnionNode,
     IntersectNode,
     ExceptNode,
@@ -284,7 +295,10 @@ class MsSqlCompiler(Visitor):
         Compiles a CREATE TABLE statement.
         """
         table = self.visit(node.table)
-        cols = ", ".join([self.visit(c) for c in node.columns])
+        parts = [self.visit(c) for c in node.columns]
+        if node.constraints:
+            parts.extend([self.visit(constraint) for constraint in node.constraints])
+        cols = ", ".join(parts)
         if node.if_not_exists:
             schema_name = node.table.schema or "dbo"
             table_name = node.table.name
@@ -318,6 +332,29 @@ class MsSqlCompiler(Visitor):
         if node.if_exists:
             return f"DROP TABLE IF EXISTS {table}"
         return f"DROP TABLE {table}"
+
+    def visit_CreateIndexStatementNode(self, node: CreateIndexStatementNode) -> str:
+        if node.if_not_exists:
+            raise ValueError("SQL Server does not support IF NOT EXISTS in CREATE INDEX.")
+        if not node.columns:
+            raise ValueError("CREATE INDEX requires at least one column.")
+        unique = "UNIQUE " if node.unique else ""
+        cols = ", ".join([self.visit(column) for column in node.columns])
+        return f"CREATE {unique}INDEX {node.name} ON {self.visit(node.table)} ({cols})"
+
+    def visit_DropIndexStatementNode(self, node: DropIndexStatementNode) -> str:
+        if node.cascade:
+            raise ValueError("SQL Server does not support CASCADE in DROP INDEX.")
+        if node.table is None:
+            raise ValueError("SQL Server DROP INDEX requires a table.")
+        if_exists = " IF EXISTS" if node.if_exists else ""
+        return f"DROP INDEX{if_exists} {node.name} ON {self.visit(node.table)}"
+
+    def visit_AlterTableStatementNode(self, node: AlterTableStatementNode) -> str:
+        if not node.actions:
+            raise ValueError("ALTER TABLE requires at least one action.")
+        actions = ", ".join([self.visit(action) for action in node.actions])
+        return f"ALTER TABLE {self.visit(node.table)} {actions}"
 
     def visit_UnionNode(self, node: UnionNode) -> str:
         """
@@ -479,3 +516,59 @@ class MsSqlCompiler(Visitor):
         raise ValueError(
             "SQL Server does not support trailing FOR UPDATE/FOR SHARE lock clauses in this compiler."
         )
+
+    def visit_PrimaryKeyConstraintNode(self, node: PrimaryKeyConstraintNode) -> str:
+        columns = node.columns or []
+        if not columns:
+            raise ValueError("PRIMARY KEY constraint requires at least one column.")
+        cols = ", ".join([column.name for column in columns])
+        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        return f"{prefix}PRIMARY KEY ({cols})"
+
+    def visit_UniqueConstraintNode(self, node: UniqueConstraintNode) -> str:
+        columns = node.columns or []
+        if not columns:
+            raise ValueError("UNIQUE constraint requires at least one column.")
+        cols = ", ".join([column.name for column in columns])
+        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        return f"{prefix}UNIQUE ({cols})"
+
+    def visit_ForeignKeyConstraintNode(self, node: ForeignKeyConstraintNode) -> str:
+        columns = node.columns or []
+        reference_columns = node.reference_columns or []
+        if not columns or not reference_columns or node.reference_table is None:
+            raise ValueError("FOREIGN KEY constraint requires columns, reference_table, and reference_columns.")
+        if len(columns) != len(reference_columns):
+            raise ValueError("FOREIGN KEY columns and reference_columns must have the same length.")
+        cols = ", ".join([column.name for column in columns])
+        ref_cols = ", ".join([column.name for column in reference_columns])
+        parts = []
+        if node.name:
+            parts.append(f"CONSTRAINT {node.name}")
+        parts.append(f"FOREIGN KEY ({cols}) REFERENCES {self.visit(node.reference_table)} ({ref_cols})")
+        if node.on_delete:
+            parts.append(f"ON DELETE {node.on_delete}")
+        if node.on_update:
+            parts.append(f"ON UPDATE {node.on_update}")
+        return " ".join(parts)
+
+    def visit_CheckConstraintNode(self, node: CheckConstraintNode) -> str:
+        if node.condition is None:
+            raise ValueError("CHECK constraint requires a condition.")
+        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        return f"{prefix}CHECK ({self.visit(node.condition)})"
+
+    def visit_AddColumnActionNode(self, node: AddColumnActionNode) -> str:
+        return f"ADD {self.visit(node.column)}"
+
+    def visit_DropColumnActionNode(self, node: DropColumnActionNode) -> str:
+        if node.if_exists:
+            raise ValueError("SQL Server does not support IF EXISTS for DROP COLUMN.")
+        return f"DROP COLUMN {node.column_name}"
+
+    def visit_AddConstraintActionNode(self, node: AddConstraintActionNode) -> str:
+        return f"ADD {self.visit(node.constraint)}"
+
+    def visit_DropConstraintActionNode(self, node: DropConstraintActionNode) -> str:
+        if_exists = " IF EXISTS" if node.if_exists else ""
+        return f"DROP CONSTRAINT{if_exists} {node.constraint_name}"

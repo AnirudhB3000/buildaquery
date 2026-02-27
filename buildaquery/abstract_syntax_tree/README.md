@@ -22,6 +22,9 @@ The AST is built using a hierarchy of nodes, all inheriting from the base `ASTNo
 -   **`UpsertClauseNode` + `ConflictTargetNode`**: Optional conflict/upsert metadata for `InsertStatementNode`, compiled as `ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, or `MERGE` depending on dialect.
 -   **`ReturningClauseNode`**: Optional write-return metadata for `InsertStatementNode`, `UpdateStatementNode`, and `DeleteStatementNode`, compiled as dialect-specific return payload SQL (`RETURNING`/`OUTPUT`).
 -   **Batch Insert Payloads**: `InsertStatementNode` accepts either single-row `values` or multi-row `rows` for first-class batch insert modeling.
+-   **Table-Level Constraints**: `PrimaryKeyConstraintNode`, `UniqueConstraintNode`, `ForeignKeyConstraintNode`, and `CheckConstraintNode` model OLTP-oriented integrity constraints on `CreateStatementNode`.
+-   **Index Statements**: `CreateIndexStatementNode` and `DropIndexStatementNode` model index lifecycle operations.
+-   **ALTER TABLE Actions**: `AlterTableStatementNode` with action nodes (`AddColumnActionNode`, `DropColumnActionNode`, `AddConstraintActionNode`, `DropConstraintActionNode`) models schema evolution paths.
 -   **`JoinClauseNode`**: Represents various types of table joins (INNER, LEFT, etc.) with associated join conditions.
 -   **Operations**: Support for both binary (e.g., `+`, `-`, `AND`, `OR`) and unary (e.g., `NOT`, `-`) operations.
 
@@ -58,3 +61,5 @@ To make the AST more robust and capable of representing the full scope of the SQ
     - [x] **Window Functions**: Support `OVER` clauses and partitioning.
     - [x] **Schema & Namespacing**: Update `TableNode` and `ColumnNode` to support qualified names (e.g., `schema.table`) and add a `CastNode` for type casting.
 - **DDL Support**: [x] Add nodes for `CREATE`, `ALTER`, and `DROP` statements for schema management.
+  - [x] Add table-level constraints (`UNIQUE`, `FOREIGN KEY`, `CHECK`, composite `PRIMARY KEY`).
+  - [x] Add index statements and alter-table action nodes for OLTP schema paths.

@@ -12,7 +12,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Write-Return Payloads**: `returning_clause` on `INSERT`/`UPDATE`/`DELETE` supports `RETURNING` and SQL Server `OUTPUT` equivalents.
 - **Batch Writes**: `InsertStatementNode.rows` supports multi-row insert payloads, and executors expose `execute_many(...)` for driver-level bulk execution.
 - **Rich Expression Logic**: Includes `CASE` expressions, `IN`, `BETWEEN`, and type casting.
-- **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
+- **Expanded DDL Support**: Table-level constraints (`PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, `CHECK`), index statements (`CREATE INDEX`/`DROP INDEX`), and `ALTER TABLE` action paths.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
 - **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
@@ -39,6 +39,10 @@ A Python-based query builder designed to represent, compile, and execute SQL que
   - All dialect compilers support multi-row insert payloads through `InsertStatementNode.rows`.
   - Oracle compiles multi-row inserts via `INSERT ALL ... SELECT 1 FROM dual`.
   - SQL Server and Oracle `MERGE` upsert paths currently require single-row `values` (not `rows`).
+- DDL constraint/index behavior:
+  - `CreateStatementNode.constraints` supports table-level `PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, and `CHECK`.
+  - `CreateIndexStatementNode` / `DropIndexStatementNode` are available with dialect-specific syntax/guards.
+  - `AlterTableStatementNode` supports add/drop column and add/drop constraint actions, with dialect-specific limitations (for example, SQLite `ALTER TABLE` is intentionally restricted in this compiler).
 
 ## Installation
 
@@ -432,6 +436,7 @@ For transaction control, see `examples/sample_transactions.py`.
 For upsert patterns, see `examples/sample_upsert.py`.
 For write-return payloads, see `examples/sample_returning.py`.
 For batch writes, see `examples/sample_batch_write.py`.
+For DDL constraints/indexes and `ALTER TABLE`, see `examples/sample_ddl_constraints.py`.
 
 ## Development Setup
 
