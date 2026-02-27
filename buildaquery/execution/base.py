@@ -147,3 +147,23 @@ class Executor(ABC):
             normalize_error=lambda exc: self._normalize_execution_error(operation="execute_many", exc=exc),
             policy=policy,
         )
+
+    # ==================================================
+    # Lifecycle Controls
+    # ==================================================
+
+    def close(self) -> None:
+        """
+        Releases executor-owned resources.
+        Subclasses should override when they hold lifecycle state.
+        """
+        return None
+
+    def __enter__(self) -> "Executor":
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        _ = exc_type
+        _ = exc
+        _ = tb
+        self.close()

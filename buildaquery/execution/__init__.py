@@ -6,6 +6,7 @@ from buildaquery.execution.mssql import MsSqlExecutor
 from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.cockroachdb import CockroachExecutor
 from buildaquery.execution.retry import RetryPolicy
+from buildaquery.execution.connection import ConnectionSettings
 from buildaquery.execution.errors import (
     ExecutionError,
     TransientExecutionError,
@@ -26,6 +27,7 @@ __all__ = [
     "MariaDbExecutor",
     "CockroachExecutor",
     "RetryPolicy",
+    "ConnectionSettings",
     "ExecutionError",
     "TransientExecutionError",
     "DeadlockError",

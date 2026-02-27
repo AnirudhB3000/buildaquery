@@ -144,6 +144,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Extended `Executor` with retry-enabled APIs: `execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, and `execute_many_with_retry`.
     *   Added unit coverage for error normalization and retry behavior (`buildaquery/tests/test_execution_error_model.py`, `buildaquery/tests/test_execution_retry.py`).
     *   Added SQLite integration coverage for normalized retry behavior under lock contention and integrity failures (`tests/test_execution_retry_integration.py`).
+*   **Production-Grade Connection Management**:
+    *   Added executor-level connection controls for pooling hooks (`acquire_connection`, `release_connection`) and dialected connect timeout configuration (`connect_timeout_seconds`).
+    *   Added lifecycle controls across executors with `close()` and context-manager support, including rollback-safe cleanup for open explicit transactions.
+    *   Added connection management unit coverage (`buildaquery/tests/test_execution_connection_management.py`) and SQLite integration coverage (`tests/test_connection_management_integration.py`).
 
 ---
 

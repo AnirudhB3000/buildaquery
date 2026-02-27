@@ -16,12 +16,25 @@ An abstract base class that defines the interface for all database executors.
 - `fetch_all_with_retry(compiled_query, retry_policy=None)`: Fetches all rows with transient-failure retries and normalized errors.
 - `fetch_one_with_retry(compiled_query, retry_policy=None)`: Fetches one row with transient-failure retries and normalized errors.
 - `execute_many_with_retry(sql, param_sets, retry_policy=None)`: Bulk execution with transient-failure retries and normalized errors.
+- `close()`: Releases executor resources and rolls back any still-open explicit transaction.
 - `begin(isolation_level=None)`: Starts an explicit transaction.
 - `commit()`: Commits the active explicit transaction.
 - `rollback()`: Rolls back the active explicit transaction.
 - `savepoint(name)`: Creates a savepoint in the active transaction.
 - `rollback_to_savepoint(name)`: Rolls back to a savepoint.
 - `release_savepoint(name)`: Releases a savepoint when supported by the dialect.
+
+Executors also support context manager lifecycle control:
+- `with PostgresExecutor(...) as executor: ...` (calls `close()` on exit).
+
+### Connection Management
+
+All executors support production-oriented connection controls:
+- `connect_timeout_seconds`: dialect-aware connect timeout.
+- `acquire_connection`: hook for external connection pool checkout.
+- `release_connection`: hook for external connection pool checkin.
+
+If `acquire_connection` is provided, executor operations use pooled connections and return them with `release_connection` (or `close()` when no release hook is provided).
 
 ### Normalized Error Types
 
@@ -97,6 +110,13 @@ try:
 except TransientExecutionError:
     # handle exhausted transient retries
     raise
+
+# 7. Connection lifecycle + pool hooks
+with PostgresExecutor(
+    connection_info="dbname=test user=postgres password=secret",
+    connect_timeout_seconds=5,
+) as managed_executor:
+    managed_executor.execute(compiled)
 ```
 
 ### Oracle Example
