@@ -2,7 +2,7 @@
 
 The `abstract_syntax_tree` module defines the data structures used to represent SQL queries as an Abstract Syntax Tree. This representation is agnostic of any specific SQL dialect and serves as the intermediate format that the query builder constructs and the compiler translates into SQL.
 
-**Dialect Notes**: The AST is dialect-agnostic and compilers target PostgreSQL, SQLite, and MySQL.
+**Dialect Notes**: The AST is dialect-agnostic and compilers target PostgreSQL, SQLite, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
 
 ## Core Concepts
 
@@ -18,6 +18,8 @@ The AST is built using a hierarchy of nodes, all inheriting from the base `ASTNo
 
 -   **`SelectStatementNode`**: The central node for `SELECT` queries. It encapsulates the select list, `FROM` table/joins, `WHERE` conditions, `GROUP BY`, `HAVING`, `ORDER BY`, and pagination (`LIMIT`, `OFFSET`, `TOP`).
 -   **`TopClauseNode`**: A specialized node for limiting results, particularly for dialects that support the `TOP` syntax. It is mutually exclusive with standard `LIMIT`/`OFFSET`.
+-   **`LockClauseNode`**: Optional row-locking clause for `SELECT` (`FOR UPDATE`, `FOR SHARE`, `NOWAIT`, `SKIP LOCKED`) with dialect-aware compiler support.
+-   **`UpsertClauseNode` + `ConflictTargetNode`**: Optional conflict/upsert metadata for `InsertStatementNode`, compiled as `ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, or `MERGE` depending on dialect.
 -   **`JoinClauseNode`**: Represents various types of table joins (INNER, LEFT, etc.) with associated join conditions.
 -   **Operations**: Support for both binary (e.g., `+`, `-`, `AND`, `OR`) and unary (e.g., `NOT`, `-`) operations.
 

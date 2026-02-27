@@ -35,7 +35,9 @@ from buildaquery.abstract_syntax_tree.models import (
     SubqueryNode,
     CTENode,
     OverClauseNode,
-    LockClauseNode
+    LockClauseNode,
+    UpsertClauseNode,
+    ConflictTargetNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -156,9 +158,35 @@ class PostgresCompiler(Visitor):
         cols = ""
         if node.columns:
             cols = f" ({', '.join([c.name for c in node.columns])})"
-        
+
         vals = ", ".join([self.visit(v) for v in node.values])
-        return f"INSERT INTO {table}{cols} VALUES ({vals})"
+        sql = f"INSERT INTO {table}{cols} VALUES ({vals})"
+        if node.upsert_clause:
+            sql += f" {self._compile_upsert_clause(node.upsert_clause)}"
+        return sql
+
+    def _compile_upsert_clause(self, clause: UpsertClauseNode) -> str:
+        if clause.do_nothing and clause.update_columns:
+            raise ValueError("Upsert cannot specify both do_nothing and update_columns.")
+        if not clause.do_nothing and not clause.update_columns:
+            raise ValueError("Upsert must specify either do_nothing or update_columns.")
+        if clause.conflict_target is None:
+            raise ValueError("PostgreSQL upsert requires conflict_target.")
+
+        target_sql = self._compile_conflict_target(clause.conflict_target)
+        if clause.do_nothing:
+            return f"ON CONFLICT {target_sql} DO NOTHING"
+
+        updates = ", ".join(
+            [f"{col} = EXCLUDED.{col}" for col in clause.update_columns or []]
+        )
+        return f"ON CONFLICT {target_sql} DO UPDATE SET {updates}"
+
+    def _compile_conflict_target(self, target: ConflictTargetNode) -> str:
+        if not target.columns:
+            raise ValueError("conflict_target must include at least one column.")
+        cols = ", ".join([col.name for col in target.columns])
+        return f"({cols})"
 
     def visit_UpdateStatementNode(self, node: UpdateStatementNode) -> str:
         """

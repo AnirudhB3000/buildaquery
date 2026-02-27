@@ -108,6 +108,14 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added CockroachDB example script (`examples/sample_cockroachdb.py`) and documentation updates across READMEs and `docs/docs.md`.
     *   Adjusted CockroachDB Docker SQL listener to use port `26258` and aligned test defaults with the new port.
     *   Cast CockroachDB string literals to `STRING` to avoid indeterminate parameter typing in `CASE` expressions.
+*   **Dialect-Aware Upsert Support**:
+    *   Added `ConflictTargetNode` and `UpsertClauseNode`, and extended `InsertStatementNode` with optional `upsert_clause`.
+    *   Implemented compiler paths for:
+        *   PostgreSQL, SQLite, CockroachDB: `ON CONFLICT (...) DO NOTHING/DO UPDATE`.
+        *   MySQL, MariaDB: `ON DUPLICATE KEY UPDATE`.
+        *   Oracle, SQL Server: `MERGE`-based upsert generation.
+    *   Added comprehensive compiler unit tests and integration tests for upsert behavior (`tests/test_upsert_integration.py`).
+    *   Updated project documentation and examples for upsert usage.
 
 ---
 

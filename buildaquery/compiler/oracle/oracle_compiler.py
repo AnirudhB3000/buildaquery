@@ -35,7 +35,9 @@ from buildaquery.abstract_syntax_tree.models import (
     SubqueryNode,
     CTENode,
     OverClauseNode,
-    LockClauseNode
+    LockClauseNode,
+    UpsertClauseNode,
+    ConflictTargetNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -142,6 +144,9 @@ class OracleCompiler(Visitor):
         """
         Compiles an INSERT statement.
         """
+        if node.upsert_clause:
+            return self._compile_merge_upsert(node)
+
         table = self.visit(node.table)
         cols = ""
         if node.columns:
@@ -149,6 +154,51 @@ class OracleCompiler(Visitor):
 
         vals = ", ".join([self.visit(v) for v in node.values])
         return f"INSERT INTO {table}{cols} VALUES ({vals})"
+
+    def _compile_merge_upsert(self, node: InsertStatementNode) -> str:
+        clause = node.upsert_clause
+        if clause is None:
+            raise ValueError("Upsert clause is required for MERGE upsert.")
+        if node.columns is None or not node.columns:
+            raise ValueError("Oracle MERGE upsert requires explicit insert columns.")
+        if clause.conflict_target is None:
+            raise ValueError("Oracle MERGE upsert requires conflict_target.")
+        if clause.do_nothing and clause.update_columns:
+            raise ValueError("Upsert cannot specify both do_nothing and update_columns.")
+        if not clause.do_nothing and not clause.update_columns:
+            raise ValueError("Upsert must specify either do_nothing or update_columns.")
+
+        table = self.visit(node.table)
+        source_sql = self._compile_merge_source(node)
+        on_sql = self._compile_merge_on(clause.conflict_target)
+
+        parts = [f"MERGE INTO {table} target USING ({source_sql}) source ON {on_sql}"]
+        if clause.update_columns:
+            updates = ", ".join([f"target.{col} = source.{col}" for col in clause.update_columns])
+            parts.append(f"WHEN MATCHED THEN UPDATE SET {updates}")
+
+        insert_cols = ", ".join([column.name for column in node.columns])
+        insert_vals = ", ".join([f"source.{column.name}" for column in node.columns])
+        parts.append(f"WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})")
+        return " ".join(parts)
+
+    def _compile_merge_source(self, node: InsertStatementNode) -> str:
+        if node.columns is None:
+            raise ValueError("Oracle MERGE upsert requires insert columns.")
+        if len(node.columns) != len(node.values):
+            raise ValueError("Insert columns and values must have the same length.")
+
+        source_items = [
+            f"{self.visit(value)} {column.name}"
+            for column, value in zip(node.columns, node.values)
+        ]
+        return f"SELECT {', '.join(source_items)} FROM dual"
+
+    def _compile_merge_on(self, target: ConflictTargetNode) -> str:
+        if not target.columns:
+            raise ValueError("conflict_target must include at least one column.")
+        clauses = [f"target.{column.name} = source.{column.name}" for column in target.columns]
+        return f"({' AND '.join(clauses)})"
 
     def visit_UpdateStatementNode(self, node: UpdateStatementNode) -> str:
         """

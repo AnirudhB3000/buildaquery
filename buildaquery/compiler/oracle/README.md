@@ -16,6 +16,7 @@ The `OracleCompiler` translates the AST into Oracle-compatible SQL with position
   - `DROP TABLE ... CASCADE` is translated to `DROP TABLE ... CASCADE CONSTRAINTS`.
 - **Table Aliases**: Oracle does not allow `AS` for table aliases; the compiler emits `table alias`.
 - **Row Locking**: Supports `lock_clause` for `FOR UPDATE` (with optional `NOWAIT` / `SKIP LOCKED`). `FOR SHARE` raises `ValueError`.
+- **Upsert**: `InsertStatementNode.upsert_clause` compiles through Oracle `MERGE` generation.
 
 ## Example
 

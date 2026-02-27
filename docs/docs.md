@@ -121,6 +121,29 @@ query = InsertStatementNode(
 )
 ```
 
+### UPSERT / CONFLICT HANDLING
+
+```python
+from buildaquery.abstract_syntax_tree.models import (
+    InsertStatementNode,
+    TableNode,
+    ColumnNode,
+    LiteralNode,
+    ConflictTargetNode,
+    UpsertClauseNode,
+)
+
+query = InsertStatementNode(
+    table=TableNode(name="users"),
+    columns=[ColumnNode(name="id"), ColumnNode(name="email")],
+    values=[LiteralNode(value=1), LiteralNode(value="alice@new.example")],
+    upsert_clause=UpsertClauseNode(
+        conflict_target=ConflictTargetNode(columns=[ColumnNode(name="id")]),
+        update_columns=["email"],
+    ),
+)
+```
+
 ### UPDATE
 
 ```python
@@ -177,6 +200,10 @@ query = DeleteStatementNode(
 - Oracle: `IF EXISTS` / `IF NOT EXISTS` are not supported for `DROP` / `CREATE`; `EXCEPT` compiles to `MINUS`.
 - SQL Server: `EXCEPT ALL`, `INTERSECT ALL`, and `DROP TABLE ... CASCADE` are not supported.
 - MariaDB: `DROP TABLE ... CASCADE` is accepted as a no-op.
+- Upsert behavior:
+  - PostgreSQL, SQLite, CockroachDB use `ON CONFLICT`.
+  - MySQL, MariaDB use `ON DUPLICATE KEY UPDATE`.
+  - Oracle, SQL Server use `MERGE`-based upsert generation.
 
 ## Testing Commands (Repo)
 

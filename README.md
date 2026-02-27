@@ -8,6 +8,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Full DML Support**: Create `SELECT`, `INSERT`, `UPDATE`, and `DELETE` statements.
 - **Advanced Querying**: Support for CTEs (`WITH`), Subqueries, Set Operations (`UNION`, `INTERSECT`, `EXCEPT`), and Window Functions (`OVER`).
 - **Concurrency Controls**: Optional `lock_clause` support on `SELECT` for row locking (`FOR UPDATE`, `FOR SHARE`, `NOWAIT`, `SKIP LOCKED`) with dialect-aware behavior.
+- **Dialect-Aware Upsert**: `InsertStatementNode.upsert_clause` supports conflict handling across dialects (`ON CONFLICT`, `ON DUPLICATE KEY UPDATE`, and `MERGE`-based paths).
 - **Rich Expression Logic**: Includes `CASE` expressions, `IN`, `BETWEEN`, and type casting.
 - **DDL Support**: Basic schema management with `CREATE TABLE` and `DROP TABLE`.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
@@ -22,6 +23,10 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - SQL Server does not support `EXCEPT ALL` / `INTERSECT ALL` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - MariaDB supports `INTERSECT` / `EXCEPT` (including `ALL`), and accepts `DROP TABLE ... CASCADE` (treated as a no-op).
 - CockroachDB supports `INTERSECT` / `EXCEPT` (including `ALL`) and `DROP TABLE ... CASCADE`.
+- Upsert behavior:
+  - PostgreSQL, SQLite, CockroachDB: `ON CONFLICT (...) DO NOTHING` / `DO UPDATE`.
+  - MySQL, MariaDB: `ON DUPLICATE KEY UPDATE` (no `DO NOTHING` mode in this AST contract).
+  - Oracle, SQL Server: `MERGE`-based upsert generation from `InsertStatementNode` + `upsert_clause`.
 
 ## Installation
 
@@ -412,6 +417,7 @@ executor.execute(drop_stmt)
 
 For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, and `examples/sample_cockroachdb.py`).
 For transaction control, see `examples/sample_transactions.py`.
+For upsert patterns, see `examples/sample_upsert.py`.
 
 ## Development Setup
 

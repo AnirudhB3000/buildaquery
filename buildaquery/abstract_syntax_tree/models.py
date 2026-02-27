@@ -111,6 +111,22 @@ class LockClauseNode(ASTNode):
     skip_locked: bool = False
 
 @dataclass
+class ConflictTargetNode(ASTNode):
+    """
+    Represents the conflict target columns used by upsert semantics.
+    """
+    columns: list[ColumnNode]
+
+@dataclass
+class UpsertClauseNode(ASTNode):
+    """
+    Represents a dialect-aware upsert strategy attached to INSERT.
+    """
+    conflict_target: ConflictTargetNode | None = None
+    do_nothing: bool = False
+    update_columns: list[str] | None = None
+
+@dataclass
 class TableNode(FromClauseNode):
     """
     Represents a table reference in the AST.
@@ -260,6 +276,7 @@ class InsertStatementNode(StatementNode):
     table: TableNode
     values: list[ExpressionNode]
     columns: list[ColumnNode] | None = None
+    upsert_clause: UpsertClauseNode | None = None
 
 @dataclass
 class UpdateStatementNode(StatementNode):

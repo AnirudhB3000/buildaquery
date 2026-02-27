@@ -35,6 +35,7 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Automatically translates `TopClauseNode` into PostgreSQL-compliant `LIMIT` and `ORDER BY` logic.
 - **Mutual Exclusivity Enforcement**: Raises a `ValueError` if a query attempts to use both `TOP` and standard `LIMIT/OFFSET`.
 - **Row Locking**: Supports `lock_clause` (`LockClauseNode`) for `FOR UPDATE`/`FOR SHARE` with optional `NOWAIT` / `SKIP LOCKED` where the dialect supports it.
+- **Upsert/Conflict Handling**: Supports `InsertStatementNode.upsert_clause` with `ON CONFLICT` (`do_nothing`/`update_columns`).
 
 ### SQLite (`SqliteCompiler`)
 
@@ -46,6 +47,7 @@ The initial implementation supports PostgreSQL.
 - **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQLite does not support `DROP TABLE ... CASCADE`.
 - **Row Locking**: Raises `ValueError` for `lock_clause` because SQLite does not support trailing `FOR UPDATE`/`FOR SHARE`.
+- **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
 
 ### MySQL (`MySqlCompiler`)
 
@@ -56,6 +58,7 @@ The initial implementation supports PostgreSQL.
 - **Set Operation Limits**: Raises a `ValueError` for `INTERSECT` and `EXCEPT` (unsupported in MySQL).
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because MySQL does not support `DROP TABLE ... CASCADE`.
 - **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
+- **Upsert/Conflict Handling**: Supports `ON DUPLICATE KEY UPDATE` via `upsert_clause.update_columns`. Rejects `do_nothing`.
 
 ### Oracle (`OracleCompiler`)
 
@@ -69,6 +72,7 @@ The initial implementation supports PostgreSQL.
 - **Table Aliases**: Emits `table alias` (Oracle does not allow `AS` for table aliases).
 - **IF EXISTS/IF NOT EXISTS**: Raises `ValueError` for `DropStatementNode.if_exists=True` and `CreateStatementNode.if_not_exists=True`.
 - **Row Locking**: Supports `FOR UPDATE` with optional `NOWAIT` / `SKIP LOCKED`; `FOR SHARE` raises `ValueError`.
+- **Upsert/Conflict Handling**: Uses `MERGE` generation when `InsertStatementNode.upsert_clause` is provided.
 
 ### SQL Server (`MsSqlCompiler`)
 
@@ -81,6 +85,7 @@ The initial implementation supports PostgreSQL.
   - `INTERSECT ALL` and `EXCEPT ALL` raise `ValueError`.
 - **CASCADE Handling**: Raises a `ValueError` when `DropStatementNode.cascade=True`, because SQL Server does not support `DROP TABLE ... CASCADE`.
 - **Row Locking**: `lock_clause` currently raises `ValueError` in this compiler (SQL Server locking uses table hints, not trailing `FOR UPDATE` syntax).
+- **Upsert/Conflict Handling**: Uses `MERGE` generation when `InsertStatementNode.upsert_clause` is provided.
 
 ### MariaDB (`MariaDbCompiler`)
 
@@ -90,6 +95,7 @@ The initial implementation supports PostgreSQL.
 - **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
 - **CASCADE Handling**: Allows `DROP TABLE ... CASCADE` (treated as a no-op by MariaDB).
 - **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
+- **Upsert/Conflict Handling**: Supports `ON DUPLICATE KEY UPDATE` via `upsert_clause.update_columns`. Rejects `do_nothing`.
 
 ### CockroachDB (`CockroachDbCompiler`)
 
@@ -99,6 +105,7 @@ The initial implementation supports PostgreSQL.
 - **Set Operations**: Supports `UNION`, `INTERSECT`, and `EXCEPT` (including `ALL` variants).
 - **CASCADE Handling**: Supports `DROP TABLE ... CASCADE`.
 - **Row Locking**: Supports `FOR UPDATE` and `FOR SHARE`, including optional `NOWAIT` / `SKIP LOCKED` via `lock_clause`.
+- **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
 
 ## Usage Example
 

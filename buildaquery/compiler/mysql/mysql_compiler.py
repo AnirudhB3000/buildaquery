@@ -35,7 +35,8 @@ from buildaquery.abstract_syntax_tree.models import (
     SubqueryNode,
     CTENode,
     OverClauseNode,
-    LockClauseNode
+    LockClauseNode,
+    UpsertClauseNode,
 )
 from buildaquery.traversal.visitor_pattern import Visitor
 
@@ -147,7 +148,21 @@ class MySqlCompiler(Visitor):
             cols = f" ({', '.join([c.name for c in node.columns])})"
 
         vals = ", ".join([self.visit(v) for v in node.values])
-        return f"INSERT INTO {table}{cols} VALUES ({vals})"
+        sql = f"INSERT INTO {table}{cols} VALUES ({vals})"
+        if node.upsert_clause:
+            sql += f" {self._compile_upsert_clause(node.upsert_clause)}"
+        return sql
+
+    def _compile_upsert_clause(self, clause: UpsertClauseNode) -> str:
+        if clause.conflict_target is not None:
+            raise ValueError("MySQL upsert does not accept conflict_target.")
+        if clause.do_nothing:
+            raise ValueError("MySQL upsert does not support do_nothing.")
+        if not clause.update_columns:
+            raise ValueError("MySQL upsert requires update_columns.")
+
+        updates = ", ".join([f"{col} = VALUES({col})" for col in clause.update_columns])
+        return f"ON DUPLICATE KEY UPDATE {updates}"
 
     def visit_UpdateStatementNode(self, node: UpdateStatementNode) -> str:
         """

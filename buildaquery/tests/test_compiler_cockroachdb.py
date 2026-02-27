@@ -8,7 +8,8 @@ from buildaquery.abstract_syntax_tree.models import (
     InNode, BetweenNode, InsertStatementNode, UpdateStatementNode,
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
-    CreateStatementNode, DropStatementNode, LockClauseNode
+    CreateStatementNode, DropStatementNode, LockClauseNode,
+    ConflictTargetNode, UpsertClauseNode
 )
 
 @pytest.fixture
@@ -132,6 +133,40 @@ def test_compile_insert(compiler):
     compiled = compiler.compile(query)
     assert compiled.sql == "INSERT INTO users (name, age) VALUES (CAST(%s AS STRING), %s)"
     assert compiled.params == ["Alice", 30]
+
+def test_compile_insert_upsert_do_nothing(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+        values=[LiteralNode(value=1), LiteralNode(value="Alice")],
+        upsert_clause=UpsertClauseNode(
+            conflict_target=ConflictTargetNode(columns=[ColumnNode(name="id")]),
+            do_nothing=True,
+        ),
+    )
+    compiled = compiler.compile(query)
+    assert (
+        compiled.sql
+        == "INSERT INTO users (id, name) VALUES (%s, CAST(%s AS STRING)) ON CONFLICT (id) DO NOTHING"
+    )
+    assert compiled.params == [1, "Alice"]
+
+def test_compile_insert_upsert_do_update(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="id"), ColumnNode(name="name"), ColumnNode(name="age")],
+        values=[LiteralNode(value=1), LiteralNode(value="Alice"), LiteralNode(value=30)],
+        upsert_clause=UpsertClauseNode(
+            conflict_target=ConflictTargetNode(columns=[ColumnNode(name="id")]),
+            update_columns=["name", "age"],
+        ),
+    )
+    compiled = compiler.compile(query)
+    assert (
+        compiled.sql
+        == "INSERT INTO users (id, name, age) VALUES (%s, CAST(%s AS STRING), %s) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, age = EXCLUDED.age"
+    )
+    assert compiled.params == [1, "Alice", 30]
 
 def test_compile_update(compiler):
     query = UpdateStatementNode(

@@ -10,6 +10,8 @@ The `MySqlCompiler` translates the AST into MySQL-compatible SQL with `%s` place
   - `INTERSECT` and `EXCEPT` raise `ValueError` (MySQL does not support them).
   - `DROP TABLE ... CASCADE` raises `ValueError`.
 - **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
+- **Upsert**: Supports `InsertStatementNode.upsert_clause` as `ON DUPLICATE KEY UPDATE` via `update_columns`.
+- **Upsert Limitation**: `do_nothing` and explicit `conflict_target` are rejected for MySQL.
 
 ## Example
 

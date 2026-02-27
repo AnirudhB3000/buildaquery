@@ -8,7 +8,8 @@ from buildaquery.abstract_syntax_tree.models import (
     InNode, BetweenNode, InsertStatementNode, UpdateStatementNode,
     CaseExpressionNode, WhenThenNode, SubqueryNode, CTENode,
     OverClauseNode, FunctionCallNode, ColumnDefinitionNode,
-    CreateStatementNode, DropStatementNode, LockClauseNode
+    CreateStatementNode, DropStatementNode, LockClauseNode,
+    ConflictTargetNode, UpsertClauseNode
 )
 
 @pytest.fixture
@@ -132,6 +133,43 @@ def test_compile_insert(compiler):
     compiled = compiler.compile(query)
     assert compiled.sql == "INSERT INTO users (name, age) VALUES (?, ?)"
     assert compiled.params == ["Alice", 30]
+
+def test_compile_insert_upsert_duplicate_key_update(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="id"), ColumnNode(name="name"), ColumnNode(name="age")],
+        values=[LiteralNode(value=1), LiteralNode(value="Alice"), LiteralNode(value=30)],
+        upsert_clause=UpsertClauseNode(update_columns=["name", "age"]),
+    )
+    compiled = compiler.compile(query)
+    assert (
+        compiled.sql
+        == "INSERT INTO users (id, name, age) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), age = VALUES(age)"
+    )
+    assert compiled.params == [1, "Alice", 30]
+
+def test_compile_insert_upsert_do_nothing_not_supported(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+        values=[LiteralNode(value=1), LiteralNode(value="Alice")],
+        upsert_clause=UpsertClauseNode(do_nothing=True),
+    )
+    with pytest.raises(ValueError, match="MariaDB upsert does not support do_nothing"):
+        compiler.compile(query)
+
+def test_compile_insert_upsert_conflict_target_not_supported(compiler):
+    query = InsertStatementNode(
+        table=TableNode(name="users"),
+        columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+        values=[LiteralNode(value=1), LiteralNode(value="Alice")],
+        upsert_clause=UpsertClauseNode(
+            conflict_target=ConflictTargetNode(columns=[ColumnNode(name="id")]),
+            update_columns=["name"],
+        ),
+    )
+    with pytest.raises(ValueError, match="MariaDB upsert does not accept conflict_target"):
+        compiler.compile(query)
 
 def test_compile_update(compiler):
     query = UpdateStatementNode(

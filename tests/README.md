@@ -1,6 +1,7 @@
 # Integration Tests
 
 This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases and a SQLite database file.
+It also includes cross-dialect transaction and upsert behavior validation suites.
 
 ## Strategy
 
@@ -69,6 +70,8 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **SQL Server Integration Test**: Create `tests/test_mssql_integration.py` using the Dockerized SQL Server Express database.
 - [x] **MariaDB Integration Test**: Create `tests/test_mariadb_integration.py` using the Dockerized MariaDB database.
 - [x] **CockroachDB Integration Test**: Create `tests/test_cockroach_integration.py` using the Dockerized CockroachDB database.
+- [x] **Transaction Integration Test**: Create `tests/test_transaction_integration.py` for cross-dialect transaction APIs.
+- [x] **Upsert Integration Test**: Create `tests/test_upsert_integration.py` for `ON CONFLICT`/`ON DUPLICATE KEY UPDATE` behavior.
 
 ## How to Run
 

@@ -9,6 +9,8 @@ The `MariaDbCompiler` translates the AST into MariaDB-compatible SQL with `?` pl
 - **Set Operations**: `UNION`, `INTERSECT`, and `EXCEPT` are supported (including `ALL` variants).
 - **DROP TABLE ... CASCADE**: Accepted and passed through (MariaDB treats `CASCADE` as a no-op).
 - **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
+- **Upsert**: Supports `InsertStatementNode.upsert_clause` as `ON DUPLICATE KEY UPDATE` via `update_columns`.
+- **Upsert Limitation**: `do_nothing` and explicit `conflict_target` are rejected for MariaDB.
 
 ## Example
 

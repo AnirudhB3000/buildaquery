@@ -9,6 +9,7 @@ The `CockroachDbCompiler` translates the AST into CockroachDB-compatible SQL wit
 - **Set Operations**: `UNION`, `INTERSECT`, and `EXCEPT` are supported (including `ALL` variants).
 - **DROP TABLE ... CASCADE**: Supported and emitted when requested.
 - **Row Locking**: Supports `lock_clause` with `FOR UPDATE` / `FOR SHARE` and optional `NOWAIT` / `SKIP LOCKED`.
+- **Upsert**: Supports `InsertStatementNode.upsert_clause` as `ON CONFLICT (...) DO NOTHING/DO UPDATE`.
 
 ## Example
 
