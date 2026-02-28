@@ -81,6 +81,8 @@ finally:
     executor.close()
 ```
 
+For first-time local validation with the fewest setup steps, use [Quick Start (SQLite)](#quick-start-sqlite-recommended).
+
 ## Quick Start (PostgreSQL)
 
 ```python
@@ -105,7 +107,7 @@ print(rows)
 executor.close()
 ```
 
-## Quick Start (SQLite)
+## Quick Start (SQLite, Recommended)
 
 ```python
 from buildaquery.execution.sqlite import SqliteExecutor
@@ -390,12 +392,14 @@ poetry run setup-tests
 poetry run integration-tests
 poetry run all-tests
 poetry run clean
+poetry run package-check
 ```
 
 ## Where To Go Next
 
 - Project overview: `README.md`
 - End-to-end examples: `examples/`
+- Syntax-only canonical quickstart example (no DB interaction): `examples/sample_syntax_quickstart.py`
 - Observability wiring example: `examples/sample_observability_integration.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:

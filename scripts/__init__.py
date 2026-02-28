@@ -2,6 +2,8 @@ import subprocess
 import shutil
 import os
 import sys
+import tempfile
+from pathlib import Path
 
 def run_unit_tests():
     """Run unit tests in buildaquery/tests."""
@@ -75,3 +77,33 @@ def setup_tests():
         sys.exit(result.returncode)
 
     print("Test setup complete.")
+
+
+def run_package_checks():
+    """Build package artifacts and validate metadata for PyPI publishing."""
+    print("Running package checks...")
+
+    # Use a unique project-local temp directory to avoid OS temp permission issues.
+    temp_root = os.path.join(os.getcwd(), ".tmp")
+    os.makedirs(temp_root, exist_ok=True)
+    temp_dir = tempfile.mkdtemp(prefix="package-build-", dir=temp_root)
+
+    env = os.environ.copy()
+    env["TMP"] = temp_dir
+    env["TEMP"] = temp_dir
+
+    try:
+        build_result = subprocess.run(["poetry", "build"], check=False, env=env)
+        if build_result.returncode != 0:
+            sys.exit(build_result.returncode)
+
+        dist_dir = Path("dist")
+        artifacts = sorted(str(path) for path in dist_dir.glob("*") if path.is_file())
+        if not artifacts:
+            print("No distribution artifacts were produced in dist/.")
+            sys.exit(1)
+
+        check_result = subprocess.run([sys.executable, "-m", "twine", "check", *artifacts], check=False)
+        sys.exit(check_result.returncode)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

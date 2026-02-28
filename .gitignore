@@ -4,3 +4,4 @@ GEMINI.md
 **/.env
 dist/
 static/test-sqlite/*
+.tmp/

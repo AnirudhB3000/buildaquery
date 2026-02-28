@@ -166,6 +166,11 @@ This project aims to create a query builder for Python with support for PostgreS
 *   **OLTP-Focused Integration Coverage**:
     *   Added `tests/test_oltp_integration.py` to validate contention with eventual retry success, deadlock normalization behavior, optimistic lost-update prevention patterns, isolation visibility semantics, and row-locking behavior (`FOR UPDATE NOWAIT` / `SKIP LOCKED`).
     *   Updated user/developer docs to include the OLTP integration coverage scope and test references.
+*   **Public API Export Stabilization (PyPI Polish)**:
+    *   Added explicit, tested public exports at package root (`buildaquery/__init__.py`) for core compiler/executor/retry/observability/error types and `__version__`.
+    *   Extended subpackage exports to include `CompiledQuery` in `buildaquery.compiler` and `MetricPoint` in `buildaquery.execution`.
+    *   Added unit coverage (`buildaquery/tests/test_public_api_exports.py`) to lock import stability for published consumers.
+    *   **Important downstream maintenance**: whenever new public symbols are introduced, update `__all__` exports in the relevant `__init__.py` modules and extend `test_public_api_exports.py` so PyPI import contracts remain stable.
 
 ---
 

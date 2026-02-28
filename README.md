@@ -153,7 +153,11 @@ poetry shell
 
 ## Quick Start
 
-Here's a simple example of creating a table, inserting data, querying it, and dropping the table. This example uses environment variables for database connection (see Environment Variables section above).
+For the fastest first run, start with SQLite in the section below (`### SQLite Quick Start (Recommended)`), which requires no external database server.
+
+### PostgreSQL Full CRUD Quick Start
+
+Here's a full CRUD example for PostgreSQL using environment variables for connection setup (see Environment Variables section above).
 
 ```python
 from dotenv import load_dotenv
@@ -215,7 +219,7 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True)
 executor.execute(drop_stmt)
 ```
 
-### SQLite Quick Start
+### SQLite Quick Start (Recommended)
 
 ```python
 from buildaquery.execution.sqlite import SqliteExecutor
@@ -455,7 +459,7 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
+For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
 For transaction control, see `examples/sample_transactions.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For connection management patterns, see `examples/sample_connection_management.py`.
@@ -529,6 +533,14 @@ Run all tests (unit and integration):
 poetry run all-tests
 ```
 
+#### Package Checks (PyPI Readiness)
+
+Build source/wheel artifacts and validate distribution metadata:
+
+```bash
+poetry run package-check
+```
+
 ### Running Examples
 
 Execute the sample script:
@@ -550,6 +562,8 @@ poetry run python examples/sample_query.py
 ## Contributing
 
 Contributions are welcome! Please see the contributing guidelines for more information.
+
+For package release steps, see [RELEASES.md](RELEASES.md).
 
 ## License
 
