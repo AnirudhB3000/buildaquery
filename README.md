@@ -19,7 +19,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Transaction APIs**: First-class transaction control with `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, and `release_savepoint()` across executors.
 - **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
-- **Observability Hooks**: Structured per-query observations (timing, operation, success/failure, tracing-safe metadata) via `ObservabilitySettings`.
+- **Observability Hooks**: Structured query observations plus lifecycle logging events (query/retry/transaction/connection) via `ObservabilitySettings`.
 
 ## OLTP Capabilities
 
@@ -33,7 +33,9 @@ The project includes first-class OLTP-oriented support across AST, compiler, exe
 - **Transient retry APIs**: `execute_with_retry(...)`, `fetch_all_with_retry(...)`, `fetch_one_with_retry(...)`, `execute_many_with_retry(...)` with `RetryPolicy`.
 - **Normalized transient errors**: `DeadlockError`, `SerializationError`, `LockTimeoutError`, and `ConnectionTimeoutError`.
 - **Connection lifecycle and pool hooks**: `close()`, context-manager control, `connect_timeout_seconds`, `acquire_connection`, and `release_connection`.
-- **Observability hooks**: per-query timing and structured execution signals using `ObservabilitySettings`.
+- **Observability hooks**: per-query timing (`query_observer`) and lifecycle logging events (`event_observer`) using `ObservabilitySettings`.
+  - Built-in JSON logger helper: `make_json_event_logger(logger=...)` for one-line structured event logs.
+  - Built-in adapters: `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
 - **OLTP integration coverage**: contention/retry correctness, deadlock normalization, lost-update prevention, isolation visibility semantics, and lock behavior validation.
 
 ## Dialect Notes
@@ -453,11 +455,12 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, and `examples/sample_observability.py`).
+For more examples, see the `examples/` directory (including `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
 For transaction control, see `examples/sample_transactions.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For connection management patterns, see `examples/sample_connection_management.py`.
 For observability hooks, see `examples/sample_observability.py`.
+For app-level observability wiring (no library source edits), see `examples/sample_observability_integration.py`.
 For upsert patterns, see `examples/sample_upsert.py`.
 For write-return payloads, see `examples/sample_returning.py`.
 For batch writes, see `examples/sample_batch_write.py`.

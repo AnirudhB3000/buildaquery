@@ -7,7 +7,18 @@ from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.cockroachdb import CockroachExecutor
 from buildaquery.execution.retry import RetryPolicy
 from buildaquery.execution.connection import ConnectionSettings
-from buildaquery.execution.observability import ObservabilitySettings, QueryObservation
+from buildaquery.execution.observability import (
+    ExecutionEvent,
+    InMemoryMetricsAdapter,
+    InMemoryTracingAdapter,
+    ObservabilitySettings,
+    QueryObservation,
+    TraceEvent,
+    TraceSpan,
+    compose_event_observers,
+    execution_event_to_dict,
+    make_json_event_logger,
+)
 from buildaquery.execution.errors import (
     ExecutionError,
     TransientExecutionError,
@@ -31,6 +42,14 @@ __all__ = [
     "ConnectionSettings",
     "ObservabilitySettings",
     "QueryObservation",
+    "ExecutionEvent",
+    "TraceEvent",
+    "TraceSpan",
+    "InMemoryMetricsAdapter",
+    "InMemoryTracingAdapter",
+    "compose_event_observers",
+    "execution_event_to_dict",
+    "make_json_event_logger",
     "ExecutionError",
     "TransientExecutionError",
     "DeadlockError",

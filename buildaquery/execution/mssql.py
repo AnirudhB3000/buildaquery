@@ -1,6 +1,8 @@
 import importlib
 from typing import Any, Sequence, cast
 from urllib.parse import parse_qs, unquote, urlparse
+import time
+from uuid import uuid4
 
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.compiled_query import CompiledQuery
@@ -46,6 +48,8 @@ class MsSqlExecutor(Executor):
         self._transaction_connection: Any | None = None
         self._transaction_release_mode: str | None = None
         self._transaction_previous_autocommit: bool | None = None
+        self._transaction_id: str | None = None
+        self._transaction_started_at: float | None = None
 
     def _compile_if_needed(self, query: CompiledQuery | ASTNode) -> CompiledQuery:
         if isinstance(query, ASTNode):
@@ -148,19 +152,27 @@ class MsSqlExecutor(Executor):
         if self.connection is not None:
             return self.connection, None
         if self.connection_settings.acquire_connection is not None:
-            return self.connection_settings.acquire_connection(), "release"
-        return self._connect(), "close"
+            self._emit_event("connection.acquire.start", success=True)
+            conn = self.connection_settings.acquire_connection()
+            self._emit_event("connection.acquire.end", success=True, connection_id=str(id(conn)))
+            return conn, "release"
+        self._emit_event("connection.acquire.start", success=True)
+        conn = self._connect()
+        self._emit_event("connection.acquire.end", success=True, connection_id=str(id(conn)))
+        return conn, "close"
 
     def _release_connection(self, conn: Any, mode: str | None) -> None:
         if mode is None:
             return
         if mode == "release":
+            self._emit_event("connection.release", success=True, connection_id=str(id(conn)))
             if self.connection_settings.release_connection is not None:
                 self.connection_settings.release_connection(conn)
                 return
             conn.close()
             return
         if mode == "close":
+            self._emit_event("connection.close", success=True, connection_id=str(id(conn)))
             conn.close()
 
     def _require_active_transaction_connection(self) -> Any:
@@ -283,11 +295,23 @@ class MsSqlExecutor(Executor):
             self._transaction_connection = self.connection
             self._transaction_release_mode = None
         elif self.connection_settings.acquire_connection is not None:
+            self._emit_event("connection.acquire.start", success=True)
             self._transaction_connection = self.connection_settings.acquire_connection()
             self._transaction_release_mode = "release"
+            self._emit_event(
+                "connection.acquire.end",
+                success=True,
+                connection_id=str(id(self._transaction_connection)),
+            )
         else:
+            self._emit_event("connection.acquire.start", success=True)
             self._transaction_connection = self._connect()
             self._transaction_release_mode = "close"
+            self._emit_event(
+                "connection.acquire.end",
+                success=True,
+                connection_id=str(id(self._transaction_connection)),
+            )
 
         if hasattr(self._transaction_connection, "autocommit"):
             self._transaction_previous_autocommit = bool(self._transaction_connection.autocommit)
@@ -301,6 +325,9 @@ class MsSqlExecutor(Executor):
                 cursor.execute(f"SET TRANSACTION ISOLATION LEVEL {isolation_level}")
         finally:
             cursor.close()
+        self._transaction_id = uuid4().hex
+        self._transaction_started_at = time.perf_counter()
+        self._emit_event("txn.begin", success=True, transaction_id=self._transaction_id)
 
     def _finalize_transaction(self) -> None:
         conn = self._transaction_connection
@@ -310,10 +337,14 @@ class MsSqlExecutor(Executor):
         self._transaction_connection = None
         self._transaction_release_mode = None
         self._transaction_previous_autocommit = None
+        self._transaction_id = None
+        self._transaction_started_at = None
         self._release_connection(conn, mode)
 
     def commit(self) -> None:
         conn = self._require_active_transaction_connection()
+        tx_id = self._transaction_id
+        started_at = self._transaction_started_at
         try:
             conn.commit()
             if (
@@ -321,11 +352,15 @@ class MsSqlExecutor(Executor):
                 and hasattr(conn, "autocommit")
             ):
                 conn.autocommit = self._transaction_previous_autocommit
+            duration_ms = None if started_at is None else (time.perf_counter() - started_at) * 1000
+            self._emit_event("txn.commit", success=True, transaction_id=tx_id, duration_ms=duration_ms)
         finally:
             self._finalize_transaction()
 
     def rollback(self) -> None:
         conn = self._require_active_transaction_connection()
+        tx_id = self._transaction_id
+        started_at = self._transaction_started_at
         try:
             conn.rollback()
             if (
@@ -333,6 +368,8 @@ class MsSqlExecutor(Executor):
                 and hasattr(conn, "autocommit")
             ):
                 conn.autocommit = self._transaction_previous_autocommit
+            duration_ms = None if started_at is None else (time.perf_counter() - started_at) * 1000
+            self._emit_event("txn.rollback", success=True, transaction_id=tx_id, duration_ms=duration_ms)
         finally:
             self._finalize_transaction()
 
@@ -343,6 +380,7 @@ class MsSqlExecutor(Executor):
             cursor.execute(f"SAVE TRANSACTION {name}")
         finally:
             cursor.close()
+        self._emit_event("txn.savepoint.create", success=True, transaction_id=self._transaction_id, savepoint_name=name)
 
     def rollback_to_savepoint(self, name: str) -> None:
         conn = self._require_active_transaction_connection()
@@ -351,9 +389,10 @@ class MsSqlExecutor(Executor):
             cursor.execute(f"ROLLBACK TRANSACTION {name}")
         finally:
             cursor.close()
+        self._emit_event("txn.savepoint.rollback", success=True, transaction_id=self._transaction_id, savepoint_name=name)
 
     def release_savepoint(self, name: str) -> None:
-        _ = name
+        self._emit_event("txn.savepoint.release", success=True, transaction_id=self._transaction_id, savepoint_name=name)
         self._require_active_transaction_connection()
 
     def close(self) -> None:
@@ -361,8 +400,12 @@ class MsSqlExecutor(Executor):
             return
         if self._transaction_connection is not None:
             conn = self._transaction_connection
+            tx_id = self._transaction_id
+            started_at = self._transaction_started_at
             try:
                 conn.rollback()
+                duration_ms = None if started_at is None else (time.perf_counter() - started_at) * 1000
+                self._emit_event("txn.rollback", success=True, transaction_id=tx_id, duration_ms=duration_ms)
             except Exception:
                 pass
             self._finalize_transaction()

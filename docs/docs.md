@@ -36,7 +36,9 @@ poetry install
 Optional resilience path:
 4. Use `RetryPolicy` + `execute_with_retry(...)` (or `fetch_all_with_retry(...)` / `fetch_one_with_retry(...)` / `execute_many_with_retry(...)`) to retry transient failures using normalized execution errors.
 5. Use executor lifecycle and connection controls (`with ...`, `close()`, `connect_timeout_seconds`, pool hooks) for production deployments.
-6. Use `ObservabilitySettings(query_observer=..., metadata=...)` to capture query timing and structured execution events.
+6. Use `ObservabilitySettings(query_observer=..., event_observer=..., metadata=...)` to capture query timing and lifecycle execution events.
+7. For immediate log visibility, wire `event_observer` with `make_json_event_logger(logger=...)`.
+8. For built-in telemetry in-process, use `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
 
 ## OLTP Features
 
@@ -53,7 +55,10 @@ For transactional workloads, Build-a-Query provides:
   - `LockTimeoutError`
   - `ConnectionTimeoutError`
 - Connection lifecycle controls (`close()`, context manager), connect timeout (`connect_timeout_seconds`), and optional pool hooks (`acquire_connection`, `release_connection`).
-- Observability hooks through `ObservabilitySettings` for query timing and structured execution events.
+- Observability hooks through `ObservabilitySettings`:
+  - `query_observer` for query timing payloads.
+  - `event_observer` for lifecycle events (`query.*`, `retry.*`, `txn.*`, `connection.*`).
+  - Built-in adapters are available for JSON logs, in-memory metrics, and in-memory tracing spans.
 
 ### Minimal Transaction + Retry Example
 
@@ -371,8 +376,8 @@ query = DeleteStatementNode(
   - All executors support pool hooks via `acquire_connection` and `release_connection`.
   - Executors support context manager lifecycle control and `close()` for resource cleanup.
 - Observability:
-  - All executors support structured query observations via `ObservabilitySettings`.
-  - Observation payloads include operation name, SQL, param count, duration, success/failure, and metadata.
+  - All executors support `query_observer` (structured query timing payloads) and `event_observer` (structured lifecycle logging events).
+  - Lifecycle event names: `query.start`, `query.end`, `retry.scheduled`, `retry.giveup`, `txn.begin`, `txn.commit`, `txn.rollback`, `txn.savepoint.create`, `txn.savepoint.rollback`, `txn.savepoint.release`, `connection.acquire.start`, `connection.acquire.end`, `connection.release`, `connection.close`.
 - OLTP integration coverage:
   - Integration tests include contention/retry success, deadlock normalization, lost-update prevention, transaction visibility isolation checks, and lock semantics (`NOWAIT`, `SKIP LOCKED`).
   - Dedicated scenarios live in `tests/test_oltp_integration.py`.
@@ -391,6 +396,7 @@ poetry run clean
 
 - Project overview: `README.md`
 - End-to-end examples: `examples/`
+- Observability wiring example: `examples/sample_observability_integration.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:
   - `buildaquery/abstract_syntax_tree/`

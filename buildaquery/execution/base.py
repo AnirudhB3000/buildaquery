@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 import time
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
+from uuid import uuid4
 from buildaquery.compiler.compiled_query import CompiledQuery
-from buildaquery.execution.errors import ExecutionError, normalize_execution_error
-from buildaquery.execution.observability import ObservabilitySettings, QueryObservation
+from buildaquery.execution.errors import ExecutionError, TransientExecutionError, normalize_execution_error
+from buildaquery.execution.observability import ExecutionEvent, ObservabilitySettings, QueryObservation
 from buildaquery.execution.retry import RetryPolicy, run_with_retry
 
 # ==================================================
@@ -89,6 +91,32 @@ class Executor(ABC):
     # Normalized Error + Retry Helpers
     # ==================================================
 
+    def _next_query_id(self) -> str:
+        return uuid4().hex
+
+    def _metadata(self, override: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        settings = getattr(self, "observability_settings", None)
+        base = dict(settings.metadata) if isinstance(settings, ObservabilitySettings) else {}
+        if override:
+            base.update(override)
+        return base
+
+    def _emit_event(self, event: str, *, success: bool, **kwargs: Any) -> None:
+        settings = getattr(self, "observability_settings", None)
+        if not isinstance(settings, ObservabilitySettings) or settings.event_observer is None:
+            return
+
+        payload = ExecutionEvent(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            event=event,
+            dialect=self._dialect_name(),
+            executor=self.__class__.__name__,
+            success=success,
+            metadata=self._metadata(),
+            **kwargs,
+        )
+        settings.event_observer(payload)
+
     def _dialect_name(self) -> str:
         name = self.__class__.__name__.lower()
         name = name.replace("executor", "")
@@ -110,8 +138,16 @@ class Executor(ABC):
         run: Any,
     ) -> Any:
         settings = getattr(self, "observability_settings", None)
-        if not isinstance(settings, ObservabilitySettings) or settings.query_observer is None:
+        if not isinstance(settings, ObservabilitySettings):
             return run()
+
+        query_id = self._next_query_id()
+        self._emit_event(
+            "query.start",
+            success=True,
+            operation=operation,
+            query_id=query_id,
+        )
 
         started = time.perf_counter()
         error: Exception | None = None
@@ -131,19 +167,29 @@ class Executor(ABC):
                 except Exception:
                     in_transaction = False
 
-            settings.query_observer(
-                QueryObservation(
-                    dialect=self._dialect_name(),
-                    operation=operation,
-                    sql=sql,
-                    param_count=len(params) if params is not None else 0,
-                    duration_ms=duration_ms,
-                    succeeded=error is None,
-                    in_transaction=in_transaction,
-                    metadata=dict(settings.metadata),
-                    error_type=type(error).__name__ if error is not None else None,
-                    error_message=str(error) if error is not None else None,
+            if settings.query_observer is not None:
+                settings.query_observer(
+                    QueryObservation(
+                        dialect=self._dialect_name(),
+                        operation=operation,
+                        sql=sql,
+                        param_count=len(params) if params is not None else 0,
+                        duration_ms=duration_ms,
+                        succeeded=error is None,
+                        in_transaction=in_transaction,
+                        metadata=self._metadata(),
+                        error_type=type(error).__name__ if error is not None else None,
+                        error_message=str(error) if error is not None else None,
+                    )
                 )
+            self._emit_event(
+                "query.end",
+                success=error is None,
+                operation=operation,
+                query_id=query_id,
+                duration_ms=duration_ms,
+                error_type=type(error).__name__ if error is not None else None,
+                error_message=str(error) if error is not None else None,
             )
 
     def execute_with_retry(
@@ -156,6 +202,25 @@ class Executor(ABC):
             operation=lambda: self.execute(compiled_query),
             normalize_error=lambda exc: self._normalize_execution_error(operation="execute", exc=exc),
             policy=policy,
+            on_retry=lambda normalized, attempt, delay: self._emit_event(
+                "retry.scheduled",
+                success=False,
+                operation="execute",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                backoff_ms=delay * 1000,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
+            on_giveup=lambda normalized, attempt: self._emit_event(
+                "retry.giveup",
+                success=False,
+                operation="execute",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
         )
 
     def fetch_all_with_retry(
@@ -168,6 +233,25 @@ class Executor(ABC):
             operation=lambda: self.fetch_all(compiled_query),
             normalize_error=lambda exc: self._normalize_execution_error(operation="fetch_all", exc=exc),
             policy=policy,
+            on_retry=lambda normalized, attempt, delay: self._emit_event(
+                "retry.scheduled",
+                success=False,
+                operation="fetch_all",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                backoff_ms=delay * 1000,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
+            on_giveup=lambda normalized, attempt: self._emit_event(
+                "retry.giveup",
+                success=False,
+                operation="fetch_all",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
         )
 
     def fetch_one_with_retry(
@@ -180,6 +264,25 @@ class Executor(ABC):
             operation=lambda: self.fetch_one(compiled_query),
             normalize_error=lambda exc: self._normalize_execution_error(operation="fetch_one", exc=exc),
             policy=policy,
+            on_retry=lambda normalized, attempt, delay: self._emit_event(
+                "retry.scheduled",
+                success=False,
+                operation="fetch_one",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                backoff_ms=delay * 1000,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
+            on_giveup=lambda normalized, attempt: self._emit_event(
+                "retry.giveup",
+                success=False,
+                operation="fetch_one",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
         )
 
     def execute_many_with_retry(
@@ -193,6 +296,25 @@ class Executor(ABC):
             operation=lambda: self.execute_many(sql, param_sets),
             normalize_error=lambda exc: self._normalize_execution_error(operation="execute_many", exc=exc),
             policy=policy,
+            on_retry=lambda normalized, attempt, delay: self._emit_event(
+                "retry.scheduled",
+                success=False,
+                operation="execute_many",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                backoff_ms=delay * 1000,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
+            on_giveup=lambda normalized, attempt: self._emit_event(
+                "retry.giveup",
+                success=False,
+                operation="execute_many",
+                retry_attempt=attempt,
+                max_attempts=policy.max_attempts,
+                error_type=type(normalized).__name__,
+                retryable=isinstance(normalized, TransientExecutionError),
+            ),
         )
 
     # ==================================================

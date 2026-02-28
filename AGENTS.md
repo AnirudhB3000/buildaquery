@@ -152,6 +152,17 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added structured query observation types (`ObservabilitySettings`, `QueryObservation`) for per-query timing and structured logging/tracing metadata.
     *   Extended all executors to emit query events across `execute`, `fetch_all`, `fetch_one`, `execute_many`, and `execute_raw`.
     *   Added observability unit coverage (`buildaquery/tests/test_execution_observability.py`) and SQLite integration coverage (`tests/test_observability_integration.py`).
+*   **Execution Lifecycle Logging Events**:
+    *   Extended observability with `ExecutionEvent` and `ObservabilitySettings.event_observer` for structured lifecycle event emission.
+    *   Added lifecycle event emission for query (`query.start`/`query.end`), retry (`retry.scheduled`/`retry.giveup`), transaction (`txn.begin`/`txn.commit`/`txn.rollback`), savepoint (`txn.savepoint.*`), and connection (`connection.acquire.*`, `connection.release`, `connection.close`) paths.
+    *   Added built-in JSON logger helpers (`execution_event_to_dict`, `make_json_event_logger`) for immediate event log output via Python `logging`.
+    *   Updated retry runner callbacks and executor instrumentation across all dialect executors.
+    *   Expanded observability unit/integration coverage for lifecycle event payloads and ordering.
+*   **Built-in Metrics + Tracing Adapters**:
+    *   Added in-process observability adapters: `InMemoryMetricsAdapter` and `InMemoryTracingAdapter`.
+    *   Added event fan-out helper `compose_event_observers(...)` to combine logger/metrics/tracing observers.
+    *   Added unit and SQLite integration coverage for adapter behavior and end-to-end event-to-telemetry mapping.
+    *   Updated examples and documentation to show combined JSON logging + metrics + tracing wiring.
 *   **OLTP-Focused Integration Coverage**:
     *   Added `tests/test_oltp_integration.py` to validate contention with eventual retry success, deadlock normalization behavior, optimistic lost-update prevention patterns, isolation visibility semantics, and row-locking behavior (`FOR UPDATE NOWAIT` / `SKIP LOCKED`).
     *   Updated user/developer docs to include the OLTP integration coverage scope and test references.

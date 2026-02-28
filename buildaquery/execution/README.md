@@ -38,11 +38,23 @@ If `acquire_connection` is provided, executor operations use pooled connections 
 
 ### Observability Hooks
 
-All executors support query-level observability through `ObservabilitySettings`:
-- `query_observer`: callback receiving a structured `QueryObservation` event.
-- `metadata`: static, tracing-safe key/value metadata attached to each query event.
+All executors support observability through `ObservabilitySettings`:
+- `query_observer`: callback receiving a structured `QueryObservation` event (query timing payload).
+- `event_observer`: callback receiving a structured `ExecutionEvent` payload (lifecycle logging events).
+- `metadata`: static, tracing-safe key/value metadata attached to each emitted payload.
 
-Each event includes dialect, operation name, SQL text, parameter count, duration in milliseconds, success/failure, transaction-state hint, and error details when a query fails.
+Built-in event adapters:
+- `make_json_event_logger(logger=...)`: emits one JSON log line per event.
+- `InMemoryMetricsAdapter()`: aggregates counters/histograms from lifecycle events.
+- `InMemoryTracingAdapter()`: builds in-memory query/transaction spans.
+- `compose_event_observers(...)`: fans out each event to multiple adapters.
+
+Lifecycle event names:
+- `query.start`, `query.end`
+- `retry.scheduled`, `retry.giveup`
+- `txn.begin`, `txn.commit`, `txn.rollback`
+- `txn.savepoint.create`, `txn.savepoint.rollback`, `txn.savepoint.release`
+- `connection.acquire.start`, `connection.acquire.end`, `connection.release`, `connection.close`
 
 ### Normalized Error Types
 
@@ -81,7 +93,15 @@ from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.execution.retry import RetryPolicy
 from buildaquery.execution.errors import TransientExecutionError
-from buildaquery.execution.observability import ObservabilitySettings, QueryObservation
+from buildaquery.execution.observability import (
+    InMemoryMetricsAdapter,
+    InMemoryTracingAdapter,
+    ObservabilitySettings,
+    QueryObservation,
+    compose_event_observers,
+    make_json_event_logger,
+)
+import logging
 
 # 1. Prepare the query (usually from a compiler)
 compiled = CompiledQuery(
@@ -133,10 +153,19 @@ def on_query(event: QueryObservation) -> None:
 
 
 # 8. Observability hook wiring
+events_logger = logging.getLogger("buildaquery.events")
+events_logger.setLevel(logging.INFO)
+events_logger.addHandler(logging.StreamHandler())
+
 observed_executor = PostgresExecutor(
     connection_info="dbname=test user=postgres password=secret",
     observability_settings=ObservabilitySettings(
         query_observer=on_query,
+        event_observer=compose_event_observers(
+            make_json_event_logger(logger=events_logger),
+            InMemoryMetricsAdapter(),
+            InMemoryTracingAdapter(),
+        ),
         metadata={"service": "api"},
     ),
 )

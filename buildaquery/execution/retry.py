@@ -47,6 +47,8 @@ def run_with_retry(
     normalize_error: Callable[[Exception], ExecutionError],
     policy: RetryPolicy,
     sleep_fn: Callable[[float], Any] = time.sleep,
+    on_retry: Callable[[ExecutionError, int, float], Any] | None = None,
+    on_giveup: Callable[[ExecutionError, int], Any] | None = None,
 ) -> T:
     """
     Runs an operation with transient-failure retry handling.
@@ -58,8 +60,12 @@ def run_with_retry(
         except Exception as exc:
             normalized = exc if isinstance(exc, ExecutionError) else normalize_error(exc)
             if attempt >= policy.max_attempts or not isinstance(normalized, TransientExecutionError):
+                if on_giveup is not None:
+                    on_giveup(normalized, attempt)
                 raise normalized from exc
             delay = _compute_delay(policy, attempt)
+            if on_retry is not None:
+                on_retry(normalized, attempt, delay)
             if delay > 0:
                 sleep_fn(delay)
             attempt += 1
