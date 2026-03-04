@@ -171,6 +171,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Extended subpackage exports to include `CompiledQuery` in `buildaquery.compiler` and `MetricPoint` in `buildaquery.execution`.
     *   Added unit coverage (`buildaquery/tests/test_public_api_exports.py`) to lock import stability for published consumers.
     *   **Important downstream maintenance**: whenever new public symbols are introduced, update `__all__` exports in the relevant `__init__.py` modules and extend `test_public_api_exports.py` so PyPI import contracts remain stable.
+*   **GitHub Actions CI Guardrails (PyPI Polish)**:
+    *   Added `.github/workflows/ci.yml` with lightweight CI checks on `push`/`pull_request` to `main`.
+    *   CI now validates `poetry install`, `poetry run unit-tests`, and `poetry run package-check`.
+    *   **Important downstream maintenance**: keep CI thin and script-driven; if local script commands change, preserve `unit-tests` and `package-check` compatibility or update workflow steps in lockstep.
 
 ---
 
