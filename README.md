@@ -78,25 +78,37 @@ Install Build-a-Query via pip:
 pip install buildaquery
 ```
 
+Install with optional database driver extras as needed:
+
+```bash
+pip install "buildaquery[postgres]"
+pip install "buildaquery[cockroach]"
+pip install "buildaquery[mysql]"
+pip install "buildaquery[mariadb]"
+pip install "buildaquery[oracle]"
+pip install "buildaquery[mssql]"
+pip install "buildaquery[all-databases]"
+```
+
 **Requirements:**
 - Python 3.12+
 - **PostgreSQL database**: A running PostgreSQL instance (version 12+ recommended). You can set this up locally, via Docker, or use a cloud service.
   - Example with Docker: `docker run --name postgres -e POSTGRES_PASSWORD=yourpassword -d -p 5432:5432 postgres:15`
-- `psycopg` (automatically installed as a dependency) - the PostgreSQL adapter for Python.
+- `psycopg` (install via `buildaquery[postgres]` or `buildaquery[cockroach]`) - the PostgreSQL/CockroachDB adapter for Python.
 - **MySQL database**: A running MySQL instance (version 8.0+ recommended).
   - Example with Docker: `docker run --name mysql -e MYSQL_ROOT_PASSWORD=yourpassword -e MYSQL_DATABASE=buildaquery -d -p 3306:3306 mysql:8.0`
-- `mysql-connector-python` (automatically installed as a dependency) - the MySQL adapter for Python.
+- `mysql-connector-python` (install via `buildaquery[mysql]`) - the MySQL adapter for Python.
 - **MariaDB database**: A running MariaDB instance (MariaDB 10.3+ recommended).
   - Example with Docker (MariaDB): `docker run --name mariadb -e MARIADB_ROOT_PASSWORD=yourpassword -e MARIADB_DATABASE=buildaquery -d -p 3306:3306 mariadb:11.4`
-- `mariadb` (automatically installed as a dependency) - the MariaDB adapter for Python.
+- `mariadb` (install via `buildaquery[mariadb]`) - the MariaDB adapter for Python.
 - **CockroachDB database**: A running CockroachDB instance.
   - Example with Docker (CockroachDB): `docker run --name cockroach -p 26257:26257 -p 8080:8080 cockroachdb/cockroach:v24.3.1 start-single-node --insecure`
 - **Oracle database**: A running Oracle instance (Oracle XE is suitable for development).
   - Example with Docker (Oracle XE): `docker run --name oracle-xe -e ORACLE_PASSWORD=yourpassword -e APP_USER=buildaquery -e APP_USER_PASSWORD=yourpassword -d -p 1521:1521 gvenzl/oracle-xe:21-slim`
-- `oracledb` (automatically installed as a dependency) - the Oracle adapter for Python.
+- `oracledb` (install via `buildaquery[oracle]`) - the Oracle adapter for Python.
 - **SQL Server database**: A running SQL Server instance (Express is suitable for development).
   - Example with Docker (SQL Server Express): `docker run --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD=yourpassword -e MSSQL_PID=Express -d -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest`
-- `pyodbc` (automatically installed as a dependency) - the SQL Server adapter for Python.
+- `pyodbc` (install via `buildaquery[mssql]`) - the SQL Server adapter for Python.
 - `python-dotenv` (automatically installed as a dependency) - for loading environment variables from a `.env` file.
 - **SQLite**: Uses Python's standard library `sqlite3` module.
   - **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).

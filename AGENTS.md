@@ -175,6 +175,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added `.github/workflows/ci.yml` with lightweight CI checks on `push`/`pull_request` to `main`.
     *   CI now validates `poetry install`, `poetry run unit-tests`, and `poetry run package-check`.
     *   **Important downstream maintenance**: keep CI thin and script-driven; if local script commands change, preserve `unit-tests` and `package-check` compatibility or update workflow steps in lockstep.
+*   **Optional Dialect Driver Extras (PyPI/CI Stability)**:
+    *   Refactored DB driver dependencies (`psycopg`, `mysql-connector-python`, `mariadb`, `oracledb`, `pyodbc`) to optional dependencies and mapped them under Poetry extras (`postgres`, `cockroach`, `mysql`, `mariadb`, `oracle`, `mssql`, `all-databases`).
+    *   Updated installation documentation to instruct users to install extras for the specific backends they use.
+    *   **Important downstream maintenance**: when adding a new dialect executor, update the extras mapping in `pyproject.toml`, the install docs, and CI/install profiles so default installs remain lightweight and deterministic.
 
 ---
 

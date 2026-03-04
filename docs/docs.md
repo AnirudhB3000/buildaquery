@@ -21,6 +21,18 @@ Supported dialects:
 pip install buildaquery
 ```
 
+Install optional database extras only for the backends you use:
+
+```bash
+pip install "buildaquery[postgres]"
+pip install "buildaquery[cockroach]"
+pip install "buildaquery[mysql]"
+pip install "buildaquery[mariadb]"
+pip install "buildaquery[oracle]"
+pip install "buildaquery[mssql]"
+pip install "buildaquery[all-databases]"
+```
+
 If you are working in this repository, use Poetry:
 
 ```bash
