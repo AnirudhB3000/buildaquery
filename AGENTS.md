@@ -1,10 +1,10 @@
 # Build-a-Query Project Goals
 
-This project aims to create a query builder for Python with support for PostgreSQL, SQLite, DuckDB, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server. The development process is broken down into the following stages: 
+This project aims to create a query builder for Python with support for PostgreSQL, SQLite, DuckDB, ClickHouse, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server. The development process is broken down into the following stages: 
 
 1.  **Abstract Syntax Tree (AST):** Define and build the necessary data structures to represent queries as an AST.
 2.  **AST Traversal:** Implement mechanisms for traversing the AST to analyze, modify, and process the query structure.
-3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, DuckDB, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
+3.  **SQL Compiler:** Develop compilers that translate the AST into valid SQL queries for PostgreSQL, SQLite, DuckDB, ClickHouse, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
 4.  **Execution Layer:** Create layers responsible for executing the compiled SQL queries against the target databases.
 
 ---
@@ -171,6 +171,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added DuckDB unit coverage (`buildaquery/tests/test_compiler_duckdb.py`, `buildaquery/tests/test_execution_duckdb.py`) and integration coverage (`tests/test_duckdb_integration.py` plus cross-dialect matrix extensions).
     *   Added DuckDB example (`examples/sample_duckdb.py`) and updated user/developer documentation and install extras.
     *   **Important downstream maintenance**: keep DuckDB included in cross-dialect capability/test matrices and extras/docs when OLTP/OLAP features are expanded.
+*   **ClickHouse Backend Support (OLAP Expansion)**:
+    *   Added `ClickHouseCompiler` and `ClickHouseExecutor` with first-class AST compile + execution support.
+    *   Added ClickHouse unit coverage (`buildaquery/tests/test_compiler_clickhouse.py`, `buildaquery/tests/test_execution_clickhouse.py`) and integration coverage (`tests/test_clickhouse_integration.py`).
+    *   Added ClickHouse syntax example (`examples/sample_clickhouse.py`) and updated user/developer documentation and install extras.
+    *   **Important downstream maintenance**: keep ClickHouse included in exports, dependency extras, and integration/docs matrices when OLTP/OLAP features are expanded.
 *   **Public API Export Stabilization (PyPI Polish)**:
     *   Added explicit, tested public exports at package root (`buildaquery/__init__.py`) for core compiler/executor/retry/observability/error types and `__version__`.
     *   Extended subpackage exports to include `CompiledQuery` in `buildaquery.compiler` and `MetricPoint` in `buildaquery.execution`.
@@ -181,7 +186,7 @@ This project aims to create a query builder for Python with support for PostgreS
     *   CI now validates `poetry install`, `poetry run unit-tests`, and `poetry run package-check`.
     *   **Important downstream maintenance**: keep CI thin and script-driven; if local script commands change, preserve `unit-tests` and `package-check` compatibility or update workflow steps in lockstep.
 *   **Optional Dialect Driver Extras (PyPI/CI Stability)**:
-    *   Refactored DB driver dependencies (`psycopg`, `mysql-connector-python`, `mariadb`, `oracledb`, `pyodbc`) to optional dependencies and mapped them under Poetry extras (`postgres`, `cockroach`, `mysql`, `mariadb`, `oracle`, `mssql`, `all-databases`).
+    *   Refactored DB driver dependencies (`psycopg`, `mysql-connector-python`, `mariadb`, `oracledb`, `pyodbc`, `clickhouse-driver`) to optional dependencies and mapped them under Poetry extras (`postgres`, `cockroach`, `mysql`, `mariadb`, `oracle`, `mssql`, `clickhouse`, `all-databases`).
     *   Updated installation documentation to instruct users to install extras for the specific backends they use.
     *   **Important downstream maintenance**: when adding a new dialect executor, update the extras mapping in `pyproject.toml`, the install docs, and CI/install profiles so default installs remain lightweight and deterministic.
 
@@ -197,14 +202,14 @@ This project aims to create a query builder for Python with support for PostgreS
 ### Architecture & Logic
 *   **AST Traversal:** Strictly adhere to the **Visitor Pattern**.
 *   **Compilation**: Favor **post-order traversal** to ensure sub-expressions resolve before parent nodes.
-*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, `DuckDbExecutor` for DuckDB, `MySqlExecutor` for MySQL, `MariaDbExecutor` for MariaDB, `CockroachExecutor` for CockroachDB, `OracleExecutor` for Oracle, and `MsSqlExecutor` for SQL Server to leverage automatic parametrization and compilation logic.
+*   **Execution**: Use `PostgresExecutor` for PostgreSQL, `SqliteExecutor` for SQLite, `DuckDbExecutor` for DuckDB, `ClickHouseExecutor` for ClickHouse, `MySqlExecutor` for MySQL, `MariaDbExecutor` for MariaDB, `CockroachExecutor` for CockroachDB, `OracleExecutor` for Oracle, and `MsSqlExecutor` for SQL Server to leverage automatic parametrization and compilation logic.
 *   **SQLite Version Note**: SQLite is provided via Python's `sqlite3` module (version depends on Python build; check `sqlite3.sqlite_version`).
 
 ### Testing Workflow
 1.  **Unit Tests**: Run `poetry run unit-tests` for rapid validation of AST/Compiler logic.
 2.  **Integration Tests**:
     *   Ensure the database is up and SQLite DB exists: `poetry run setup-tests`.
-    *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, SQLite, and DuckDB).
+    *   Run `poetry run integration-tests` (covers PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, ClickHouse, SQLite, and DuckDB).
 3.  **Cleanup**: Periodically run `poetry run clean` to keep the workspace tidy.
 
 ### Edit Approval Protocol

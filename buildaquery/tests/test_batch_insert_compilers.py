@@ -9,6 +9,7 @@ from buildaquery.abstract_syntax_tree.models import (
     UpsertClauseNode,
 )
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
+from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
@@ -44,6 +45,11 @@ from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
         (
             CockroachDbCompiler(),
             "INSERT INTO users (id, name) VALUES (%s, CAST(%s AS STRING)), (%s, CAST(%s AS STRING))",
+            [1, "a", 2, "b"],
+        ),
+        (
+            ClickHouseCompiler(),
+            "INSERT INTO users (id, name) VALUES (%s, %s), (%s, %s)",
             [1, "a", 2, "b"],
         ),
         (

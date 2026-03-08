@@ -1,6 +1,6 @@
 # Integration Tests
 
-This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases and SQLite/DuckDB database files.
+This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, and ClickHouse databases and SQLite/DuckDB database files.
 It also includes cross-dialect transaction and upsert behavior validation suites.
 It also includes cross-dialect write-return payload validation (`RETURNING`/`OUTPUT`).
 It also includes cross-dialect batch write validation (multi-row insert AST and executor `execute_many`).
@@ -12,10 +12,10 @@ It also includes OLTP-focused integration validation (contention/retry success, 
 
 ## Strategy
 
-We use local Docker-based PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server instances and file-based SQLite/DuckDB databases for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
+We use local Docker-based PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, and ClickHouse instances and file-based SQLite/DuckDB databases for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
 
 ### 1. Database Infrastructure
-We use Docker to provide consistent PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server environments without requiring local installations.
+We use Docker to provide consistent PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, and ClickHouse environments without requiring local installations.
 DuckDB uses local files and does not require Docker.
 
 - **Image**: `postgres:15`
@@ -58,6 +58,13 @@ DuckDB uses local files and does not require Docker.
 - **Credentials**: Configured via `docker-compose.yml` and `conftest.py`.
 - **Default URL**: `mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes` (override with `MSSQL_DATABASE_URL`).
 
+#### ClickHouse
+- **Image**: `clickhouse/clickhouse-server:24.8`
+- **Port**: `9001` (Mapped to 9000 in container to avoid local conflicts)
+- **Host**: `127.0.0.1`
+- **Credentials**: `buildaquery` / `password` (configured in `docker-compose.yml`).
+- **Default URL**: `clickhouse://buildaquery:password@127.0.0.1:9001/buildaquery_test` (override with `CLICKHOUSE_DATABASE_URL`).
+
 ### 2. Schema Lifecycle
 The tests themselves handle table creation and cleanup using `pytest` fixtures.
 
@@ -79,6 +86,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **MariaDB Integration Test**: Create `tests/test_mariadb_integration.py` using the Dockerized MariaDB database.
 - [x] **CockroachDB Integration Test**: Create `tests/test_cockroach_integration.py` using the Dockerized CockroachDB database.
 - [x] **DuckDB Integration Test**: Create `tests/test_duckdb_integration.py` using local DuckDB database files.
+- [x] **ClickHouse Integration Test**: Create `tests/test_clickhouse_integration.py` using Dockerized ClickHouse.
 - [x] **Transaction Integration Test**: Create `tests/test_transaction_integration.py` for cross-dialect transaction APIs.
 - [x] **Upsert Integration Test**: Create `tests/test_upsert_integration.py` for `ON CONFLICT`/`ON DUPLICATE KEY UPDATE` behavior.
 - [x] **Write-Return Integration Test**: Create `tests/test_returning_integration.py` for `RETURNING`/`OUTPUT` behavior.
@@ -135,3 +143,8 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 
 - **Driver**: `duckdb` (required for DuckDB integration tests).
 - **Database File**: `static/test-duckdb/*.duckdb` (created per test and cleaned by table teardown logic).
+
+## ClickHouse Details
+
+- **Driver**: `clickhouse-driver` (required for ClickHouse integration tests).
+- **Default URL**: `clickhouse://buildaquery:password@127.0.0.1:9001/buildaquery_test` (override with `CLICKHOUSE_DATABASE_URL`).

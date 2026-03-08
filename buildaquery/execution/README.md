@@ -88,6 +88,11 @@ A concrete implementation for DuckDB using `duckdb`.
 
 DuckDB savepoint APIs are runtime-version dependent; when unsupported by the installed DuckDB runtime, the executor raises a clear `RuntimeError` for savepoint operations.
 
+### `ClickHouseExecutor`
+A concrete implementation for ClickHouse using `clickhouse-driver` DB-API.
+
+`ClickHouseExecutor` does not support explicit transaction/savepoint APIs and raises a clear `RuntimeError` for those calls.
+
 ### `OracleExecutor`
 A concrete implementation for Oracle using `oracledb`.
 
@@ -252,6 +257,18 @@ executor = DuckDbExecutor(connection_info="static/test-duckdb/sample.duckdb")
 rows = executor.fetch_all(compiled)
 ```
 
+### ClickHouse Example
+
+```python
+from buildaquery.execution.clickhouse import ClickHouseExecutor
+from buildaquery.compiler.compiled_query import CompiledQuery
+
+executor = ClickHouseExecutor(connection_info="clickhouse://default@127.0.0.1:9000/default")
+rows = executor.fetch_all(
+    CompiledQuery(sql="SELECT %s AS id", params=[1])
+)
+```
+
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
@@ -262,3 +279,4 @@ Different executors require specific database drivers:
 - `MariaDbExecutor` requires `mariadb` (`pip install mariadb`).
 - `CockroachExecutor` requires `psycopg` (`pip install psycopg[binary]`).
 - `DuckDbExecutor` requires `duckdb` (`pip install duckdb`).
+- `ClickHouseExecutor` requires `clickhouse-driver` (`pip install clickhouse-driver`).

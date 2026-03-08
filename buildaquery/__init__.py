@@ -2,6 +2,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from buildaquery.compiler import (
     CockroachDbCompiler,
+    ClickHouseCompiler,
     CompiledQuery,
     DuckDbCompiler,
     MariaDbCompiler,
@@ -13,6 +14,7 @@ from buildaquery.compiler import (
 )
 from buildaquery.execution import (
     CockroachExecutor,
+    ClickHouseExecutor,
     ConnectionSettings,
     ConnectionTimeoutError,
     DeadlockError,
@@ -55,6 +57,7 @@ __all__ = [
     "MySqlCompiler",
     "MariaDbCompiler",
     "CockroachDbCompiler",
+    "ClickHouseCompiler",
     "DuckDbCompiler",
     "OracleCompiler",
     "MsSqlCompiler",
@@ -64,6 +67,7 @@ __all__ = [
     "MySqlExecutor",
     "MariaDbExecutor",
     "CockroachExecutor",
+    "ClickHouseExecutor",
     "DuckDbExecutor",
     "OracleExecutor",
     "MsSqlExecutor",

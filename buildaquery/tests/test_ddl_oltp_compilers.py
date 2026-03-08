@@ -19,6 +19,7 @@ from buildaquery.abstract_syntax_tree.models import (
     UniqueConstraintNode,
 )
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
+from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
@@ -34,6 +35,7 @@ COMPILERS = [
     MySqlCompiler,
     MariaDbCompiler,
     CockroachDbCompiler,
+    ClickHouseCompiler,
     DuckDbCompiler,
     OracleCompiler,
     MsSqlCompiler,
@@ -161,7 +163,10 @@ def test_create_drop_index_oracle() -> None:
     assert drop_compiled.sql == "DROP INDEX idx_orders_customer"
 
 
-@pytest.mark.parametrize("compiler_type", [PostgresCompiler, CockroachDbCompiler, MySqlCompiler, MariaDbCompiler, MsSqlCompiler])
+@pytest.mark.parametrize(
+    "compiler_type",
+    [PostgresCompiler, CockroachDbCompiler, ClickHouseCompiler, MySqlCompiler, MariaDbCompiler, MsSqlCompiler],
+)
 def test_alter_table_actions_compile_for_multi_action_dialects(compiler_type) -> None:
     compiler = compiler_type()
     compiled = compiler.compile(

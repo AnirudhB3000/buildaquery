@@ -141,6 +141,13 @@ The initial implementation supports PostgreSQL.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 - **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and restricted `ALTER TABLE` actions.
 
+### ClickHouse (`ClickHouseCompiler`)
+
+#### Key Features:
+- **`%s` Placeholders**: Uses ClickHouse-compatible parameter style with `clickhouse-driver`.
+- **Core AST Coverage**: Reuses PostgreSQL SQL generation for supported paths.
+- **Unsupported Paths**: Raises `ValueError` for `lock_clause`, `upsert_clause`, generic `RETURNING`, and `DROP TABLE ... CASCADE`.
+
 ## Usage Example
 
 ```python
@@ -152,6 +159,7 @@ from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
 from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
+from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -192,5 +200,10 @@ print(compiled.params) # [123]
 duckdb_compiler = DuckDbCompiler()
 compiled = duckdb_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
+print(compiled.params) # [123]
+
+clickhouse_compiler = ClickHouseCompiler()
+compiled = clickhouse_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 ```

@@ -10,6 +10,7 @@ Supported dialects:
 - PostgreSQL
 - SQLite
 - DuckDB
+- ClickHouse
 - MySQL
 - MariaDB
 - CockroachDB
@@ -32,6 +33,7 @@ pip install "buildaquery[mariadb]"
 pip install "buildaquery[oracle]"
 pip install "buildaquery[mssql]"
 pip install "buildaquery[duckdb]"
+pip install "buildaquery[clickhouse]"
 pip install "buildaquery[all-databases]"
 ```
 
@@ -60,6 +62,7 @@ For transactional workloads, Build-a-Query provides:
 
 - Transaction control APIs: `begin()`, `commit()`, `rollback()`, `savepoint(name)`, `rollback_to_savepoint(name)`, and `release_savepoint(name)`.
   - DuckDB note: savepoint APIs are runtime-version dependent; unsupported runtimes raise a clear executor `RuntimeError`.
+  - ClickHouse note: explicit transaction/savepoint APIs are not supported by `ClickHouseExecutor`.
 - Concurrency lock clauses on `SELECT` (dialect-aware), including `NOWAIT` and `SKIP LOCKED` on supported backends.
 - Dialect-aware upsert support with conflict handling.
 - Write-return payloads through `returning_clause` (`RETURNING`/`OUTPUT` equivalents by dialect).
@@ -163,6 +166,39 @@ query = SelectStatementNode(
 )
 
 rows = executor.execute(query)
+print(rows)
+```
+
+## Quick Start (ClickHouse)
+
+```python
+from buildaquery.execution.clickhouse import ClickHouseExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    ColumnNode,
+    InsertStatementNode,
+    LiteralNode,
+    SelectStatementNode,
+    TableNode,
+)
+
+executor = ClickHouseExecutor(connection_info="clickhouse://buildaquery:password@127.0.0.1:9001/buildaquery_test")
+events = TableNode(name="events")
+
+# ClickHouse CREATE TABLE typically requires an engine clause, so use raw SQL.
+executor.execute_raw("CREATE TABLE IF NOT EXISTS events (id UInt32, value String) ENGINE = Memory")
+executor.execute(
+    InsertStatementNode(
+        table=events,
+        columns=[ColumnNode(name="id"), ColumnNode(name="value")],
+        values=[LiteralNode(value=1), LiteralNode(value="hello")],
+    )
+)
+rows = executor.execute(
+    SelectStatementNode(
+        select_list=[ColumnNode(name="id"), ColumnNode(name="value")],
+        from_table=events,
+    )
+)
 print(rows)
 ```
 
@@ -385,6 +421,7 @@ query = DeleteStatementNode(
 - MySQL: `INTERSECT`, `EXCEPT`, and `DROP TABLE ... CASCADE` are not supported.
 - SQLite: `DROP TABLE ... CASCADE` is not supported.
 - DuckDB: `DROP TABLE ... CASCADE` and trailing row-lock clauses (`FOR UPDATE` / `FOR SHARE`) are not supported in this compiler.
+- ClickHouse: `DROP TABLE ... CASCADE`, row-lock clauses, upsert clauses, and generic `RETURNING` payloads are not supported in this compiler. `ClickHouseExecutor` does not expose explicit transaction/savepoint APIs.
 - Oracle: `IF EXISTS` / `IF NOT EXISTS` are not supported for `DROP` / `CREATE`; `EXCEPT` compiles to `MINUS`.
 - SQL Server: `EXCEPT ALL`, `INTERSECT ALL`, and `DROP TABLE ... CASCADE` are not supported.
 - MariaDB: `DROP TABLE ... CASCADE` is accepted as a no-op.
@@ -438,6 +475,7 @@ poetry run package-check
 - End-to-end examples: `examples/`
 - Syntax-only canonical quickstart example (no DB interaction): `examples/sample_syntax_quickstart.py`
 - DuckDB example: `examples/sample_duckdb.py`
+- ClickHouse syntax example: `examples/sample_clickhouse.py`
 - Observability wiring example: `examples/sample_observability_integration.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:

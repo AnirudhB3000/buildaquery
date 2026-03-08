@@ -1,6 +1,6 @@
 # Build-a-Query
 
-A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, DuckDB, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
+A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, DuckDB, ClickHouse, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
 
 ## Features
 
@@ -15,7 +15,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Expanded DDL Support**: Table-level constraints (`PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, `CHECK`), index statements (`CREATE INDEX`/`DROP INDEX`), and `ALTER TABLE` action paths.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
 - **Secure Compilation**: Automatic parameterization to prevent SQL injection.
-- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `duckdb` (DuckDB), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
+- **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `duckdb` (DuckDB), `clickhouse-driver` (ClickHouse), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 - **Transaction APIs**: First-class transaction control with `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, and `release_savepoint()` across executors.
 - **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
@@ -43,6 +43,7 @@ The project includes first-class OLTP-oriented support across AST, compiler, exe
 - MySQL does not support `INTERSECT` / `EXCEPT` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - SQLite does not support `DROP TABLE ... CASCADE` (the compiler raises `ValueError`).
 - DuckDB does not support `DROP TABLE ... CASCADE` or trailing row-lock clauses (`FOR UPDATE` / `FOR SHARE`) in this compiler.
+- ClickHouse does not support `DROP TABLE ... CASCADE`, row-lock clauses (`FOR UPDATE` / `FOR SHARE`), upsert clauses, generic `RETURNING` payloads, or explicit transaction/savepoint APIs in this executor.
 - Oracle does not support `IF EXISTS` / `IF NOT EXISTS` in `DROP TABLE`/`CREATE TABLE` (the compiler raises `ValueError`), and `EXCEPT` is compiled as `MINUS`.
 - SQL Server does not support `EXCEPT ALL` / `INTERSECT ALL` or `DROP TABLE ... CASCADE` in this implementation (the compiler raises `ValueError`).
 - MariaDB supports `INTERSECT` / `EXCEPT` (including `ALL`), and accepts `DROP TABLE ... CASCADE` (treated as a no-op).
@@ -90,6 +91,7 @@ pip install "buildaquery[mariadb]"
 pip install "buildaquery[oracle]"
 pip install "buildaquery[mssql]"
 pip install "buildaquery[duckdb]"
+pip install "buildaquery[clickhouse]"
 pip install "buildaquery[all-databases]"
 ```
 
@@ -117,6 +119,8 @@ pip install "buildaquery[all-databases]"
   - **SQLite Version**: SQLite 3.x via Python's `sqlite3` module (the exact SQLite version depends on your Python build; check `sqlite3.sqlite_version` at runtime).
 - **DuckDB**: Embedded OLAP database via the `duckdb` Python package.
   - Install driver via `buildaquery[duckdb]`.
+- **ClickHouse**: Columnar OLAP database via `clickhouse-driver`.
+  - Install driver via `buildaquery[clickhouse]`.
 
 ### Environment Variables
 
@@ -148,6 +152,8 @@ For MariaDB, use a connection URL in the format `mariadb://user:password@host:po
 For CockroachDB, use a connection URL in the format `postgresql://user@host:port/dbname?sslmode=disable` (for example: `postgresql://root@127.0.0.1:26257/buildaquery?sslmode=disable`).
 
 For DuckDB, use a local database file path (for example: `static/test-duckdb/db.duckdb`) or `:memory:`.
+
+For ClickHouse, use a connection URL in the format `clickhouse://user:password@host:port/database` (for example: `clickhouse://buildaquery:password@127.0.0.1:9001/buildaquery_test` for this repo's Docker test service).
 
 ### For Developers
 
@@ -316,6 +322,41 @@ print(executor.execute(select_stmt))
 
 drop_stmt = DropStatementNode(table=users_table, if_exists=True)
 executor.execute(drop_stmt)
+```
+
+### ClickHouse Quick Start
+
+```python
+from buildaquery.execution.clickhouse import ClickHouseExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    ColumnNode,
+    InsertStatementNode,
+    LiteralNode,
+    SelectStatementNode,
+    TableNode,
+)
+
+executor = ClickHouseExecutor(connection_info="clickhouse://default@127.0.0.1:9000/default")
+events_table = TableNode(name="events")
+
+# ClickHouse table creation usually requires an engine clause, so use raw SQL here.
+executor.execute_raw("CREATE TABLE IF NOT EXISTS events (id UInt32, value String) ENGINE = Memory")
+
+insert_stmt = InsertStatementNode(
+    table=events_table,
+    columns=[ColumnNode(name="id"), ColumnNode(name="value")],
+    values=[LiteralNode(value=1), LiteralNode(value="hello")],
+)
+executor.execute(insert_stmt)
+
+select_stmt = SelectStatementNode(
+    select_list=[ColumnNode(name="id"), ColumnNode(name="value")],
+    from_table=events_table,
+)
+print(executor.execute(select_stmt))
+
+executor.execute_raw("DROP TABLE IF EXISTS events")
+executor.close()
 ```
 
 ### MySQL Quick Start
@@ -518,7 +559,7 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_duckdb.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
+For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_duckdb.py`, `examples/sample_clickhouse.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
 For transaction control, see `examples/sample_transactions.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For connection management patterns, see `examples/sample_connection_management.py`.
@@ -567,7 +608,7 @@ poetry run pytest buildaquery/tests
 
 #### Integration Tests
 
-Integration tests require PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases (and the respective drivers). DuckDB and SQLite integration tests use local database files.
+Integration tests require PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, and ClickHouse databases (and the respective drivers). DuckDB and SQLite integration tests use local database files.
 Start the server-based test databases using Docker:
 
 ```bash
@@ -613,7 +654,7 @@ poetry run python examples/sample_syntax_quickstart.py
 
 - `buildaquery/abstract_syntax_tree/`: Defines query nodes and AST models.
 - `buildaquery/traversal/`: Base classes for AST traversal (Visitor/Transformer pattern).
-- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, DuckDB, MySQL, MariaDB, CockroachDB, Oracle, SQL Server).
+- `buildaquery/compiler/`: Dialect-specific SQL generation (PostgreSQL, SQLite, DuckDB, ClickHouse, MySQL, MariaDB, CockroachDB, Oracle, SQL Server).
 - `buildaquery/execution/`: Database connection and execution logic.
 - `tests/`: Exhaustive unit and integration tests.
 - `examples/`: Practical demonstrations of the library.

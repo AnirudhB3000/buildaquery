@@ -6,6 +6,7 @@ from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
 from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
+from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 from buildaquery.compiler.compiled_query import CompiledQuery
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "MariaDbCompiler",
     "CockroachDbCompiler",
     "DuckDbCompiler",
+    "ClickHouseCompiler",
     "CompiledQuery",
 ]

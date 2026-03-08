@@ -56,3 +56,15 @@ services:
       - "26258:26258"
       - "8081:8080"
     restart: always
+  test_clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: buildaquery_test_clickhouse
+    environment:
+      CLICKHOUSE_DB: buildaquery_test
+      CLICKHOUSE_USER: buildaquery
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "9001:9000"
+      - "8124:8123"
+    restart: always
