@@ -20,6 +20,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
 - **Observability Hooks**: Structured query observations plus lifecycle logging events (query/retry/transaction/connection) via `ObservabilitySettings`.
+- **Boundary Input Validation (Optional)**: Minimal Pydantic models/translators for validating external config and raw execution payloads before executor usage.
 
 ## OLTP Capabilities
 
@@ -92,6 +93,7 @@ pip install "buildaquery[oracle]"
 pip install "buildaquery[mssql]"
 pip install "buildaquery[duckdb]"
 pip install "buildaquery[clickhouse]"
+pip install "buildaquery[validation]"
 pip install "buildaquery[all-databases]"
 ```
 
@@ -560,6 +562,7 @@ executor.execute(drop_stmt)
 ```
 
 For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_duckdb.py`, `examples/sample_clickhouse.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
+For boundary validation patterns with external payloads, see `examples/sample_validation.py`.
 For transaction control, see `examples/sample_transactions.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For connection management patterns, see `examples/sample_connection_management.py`.

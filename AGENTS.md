@@ -189,6 +189,12 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Refactored DB driver dependencies (`psycopg`, `mysql-connector-python`, `mariadb`, `oracledb`, `pyodbc`, `clickhouse-driver`) to optional dependencies and mapped them under Poetry extras (`postgres`, `cockroach`, `mysql`, `mariadb`, `oracle`, `mssql`, `clickhouse`, `all-databases`).
     *   Updated installation documentation to instruct users to install extras for the specific backends they use.
     *   **Important downstream maintenance**: when adding a new dialect executor, update the extras mapping in `pyproject.toml`, the install docs, and CI/install profiles so default installs remain lightweight and deterministic.
+*   **Optional Pydantic Boundary Validation (External Inputs)**:
+    *   Added opt-in `buildaquery.validation` package with minimal Pydantic models for validating external executor config and raw SQL payloads (`ExecutorInputConfigModel`, `RawExecutionRequestModel`).
+    *   Added translator helpers (`to_connection_settings_kwargs`, `to_retry_policy`, `to_raw_execution_payload`) to map validated inputs into existing executor/retry APIs without changing executor internals.
+    *   Added unit and SQLite boundary integration tests for validation success/failure behavior.
+    *   Updated user/developer docs and examples with optional install/use path (`buildaquery[validation]`, `examples/sample_validation.py`).
+    *   **Important downstream maintenance**: keep validation logic at external boundaries; when adding new external input shapes, add corresponding model, translator, tests, and docs without coupling Pydantic into AST/compiler/executor cores.
 
 ---
 

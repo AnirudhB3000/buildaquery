@@ -34,6 +34,7 @@ pip install "buildaquery[oracle]"
 pip install "buildaquery[mssql]"
 pip install "buildaquery[duckdb]"
 pip install "buildaquery[clickhouse]"
+pip install "buildaquery[validation]"
 pip install "buildaquery[all-databases]"
 ```
 
@@ -55,6 +56,32 @@ Optional resilience path:
 6. Use `ObservabilitySettings(query_observer=..., event_observer=..., metadata=...)` to capture query timing and lifecycle execution events.
 7. For immediate log visibility, wire `event_observer` with `make_json_event_logger(logger=...)`.
 8. For built-in telemetry in-process, use `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
+9. If input comes from external sources, validate it first with the optional `buildaquery.validation` models/translators.
+
+## Optional Boundary Validation
+
+Use minimal Pydantic validation at the app boundary for external payloads (API/CLI/job/env input).
+
+```python
+from buildaquery.validation import (
+    ExecutorInputConfigModel,
+    RawExecutionRequestModel,
+    to_connection_settings_kwargs,
+    to_raw_execution_payload,
+)
+
+validated_config = ExecutorInputConfigModel(
+    connection_info="postgresql://user:password@localhost:5432/mydb",
+    connect_timeout_seconds=3,
+)
+validated_query = RawExecutionRequestModel(
+    sql="SELECT * FROM users WHERE id = %s",
+    params=[1],
+)
+
+connection_kwargs = to_connection_settings_kwargs(validated_config)
+sql, params = to_raw_execution_payload(validated_query)
+```
 
 ## OLTP Features
 
@@ -477,6 +504,7 @@ poetry run package-check
 - DuckDB example: `examples/sample_duckdb.py`
 - ClickHouse syntax example: `examples/sample_clickhouse.py`
 - Observability wiring example: `examples/sample_observability_integration.py`
+- Boundary validation example: `examples/sample_validation.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:
   - `buildaquery/abstract_syntax_tree/`

@@ -36,6 +36,10 @@ All executors support production-oriented connection controls:
 
 If `acquire_connection` is provided, executor operations use pooled connections and return them with `release_connection` (or `close()` when no release hook is provided).
 
+### External Input Validation Boundary
+
+For untrusted external payloads (API/CLI/job/env), validate before executor construction/calls using the optional `buildaquery.validation` package (Pydantic-backed). This keeps executor internals lightweight while enforcing boundary checks.
+
 ### Observability Hooks
 
 All executors support observability through `ObservabilitySettings`:
@@ -280,3 +284,4 @@ Different executors require specific database drivers:
 - `CockroachExecutor` requires `psycopg` (`pip install psycopg[binary]`).
 - `DuckDbExecutor` requires `duckdb` (`pip install duckdb`).
 - `ClickHouseExecutor` requires `clickhouse-driver` (`pip install clickhouse-driver`).
+- Optional boundary validation utilities require `pydantic` (`pip install "buildaquery[validation]"`).
