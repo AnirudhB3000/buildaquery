@@ -9,6 +9,7 @@ Build-a-Query is a Python query builder that uses an Abstract Syntax Tree (AST) 
 Supported dialects:
 - PostgreSQL
 - SQLite
+- DuckDB
 - MySQL
 - MariaDB
 - CockroachDB
@@ -30,6 +31,7 @@ pip install "buildaquery[mysql]"
 pip install "buildaquery[mariadb]"
 pip install "buildaquery[oracle]"
 pip install "buildaquery[mssql]"
+pip install "buildaquery[duckdb]"
 pip install "buildaquery[all-databases]"
 ```
 
@@ -57,6 +59,7 @@ Optional resilience path:
 For transactional workloads, Build-a-Query provides:
 
 - Transaction control APIs: `begin()`, `commit()`, `rollback()`, `savepoint(name)`, `rollback_to_savepoint(name)`, and `release_savepoint(name)`.
+  - DuckDB note: savepoint APIs are runtime-version dependent; unsupported runtimes raise a clear executor `RuntimeError`.
 - Concurrency lock clauses on `SELECT` (dialect-aware), including `NOWAIT` and `SKIP LOCKED` on supported backends.
 - Dialect-aware upsert support with conflict handling.
 - Write-return payloads through `returning_clause` (`RETURNING`/`OUTPUT` equivalents by dialect).
@@ -141,6 +144,27 @@ print(rows)
 ```
 
 SQLite version is provided by Python's `sqlite3` build. Check with `sqlite3.sqlite_version`.
+
+## Quick Start (DuckDB)
+
+```python
+from buildaquery.execution.duckdb import DuckDbExecutor
+from buildaquery.abstract_syntax_tree.models import (
+    SelectStatementNode,
+    TableNode,
+    StarNode,
+)
+
+executor = DuckDbExecutor(connection_info="static/test-duckdb/sample.duckdb")
+
+query = SelectStatementNode(
+    select_list=[StarNode()],
+    from_table=TableNode(name="users"),
+)
+
+rows = executor.execute(query)
+print(rows)
+```
 
 ## Basic Query Examples
 
@@ -360,6 +384,7 @@ query = DeleteStatementNode(
 
 - MySQL: `INTERSECT`, `EXCEPT`, and `DROP TABLE ... CASCADE` are not supported.
 - SQLite: `DROP TABLE ... CASCADE` is not supported.
+- DuckDB: `DROP TABLE ... CASCADE` and trailing row-lock clauses (`FOR UPDATE` / `FOR SHARE`) are not supported in this compiler.
 - Oracle: `IF EXISTS` / `IF NOT EXISTS` are not supported for `DROP` / `CREATE`; `EXCEPT` compiles to `MINUS`.
 - SQL Server: `EXCEPT ALL`, `INTERSECT ALL`, and `DROP TABLE ... CASCADE` are not supported.
 - MariaDB: `DROP TABLE ... CASCADE` is accepted as a no-op.
@@ -412,6 +437,7 @@ poetry run package-check
 - Project overview: `README.md`
 - End-to-end examples: `examples/`
 - Syntax-only canonical quickstart example (no DB interaction): `examples/sample_syntax_quickstart.py`
+- DuckDB example: `examples/sample_duckdb.py`
 - Observability wiring example: `examples/sample_observability_integration.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:

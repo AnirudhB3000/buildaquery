@@ -1,6 +1,6 @@
 # Integration Tests
 
-This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases and a SQLite database file.
+This directory contains integration tests that verify the full query lifecycle—from AST construction and compilation to execution against live PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server databases and SQLite/DuckDB database files.
 It also includes cross-dialect transaction and upsert behavior validation suites.
 It also includes cross-dialect write-return payload validation (`RETURNING`/`OUTPUT`).
 It also includes cross-dialect batch write validation (multi-row insert AST and executor `execute_many`).
@@ -12,10 +12,11 @@ It also includes OLTP-focused integration validation (contention/retry success, 
 
 ## Strategy
 
-We use local Docker-based PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server instances and a file-based SQLite database for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
+We use local Docker-based PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server instances and file-based SQLite/DuckDB databases for integration testing. Each test suite is responsible for its own schema management (creating and dropping tables) to ensure consistency.
 
 ### 1. Database Infrastructure
 We use Docker to provide consistent PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server environments without requiring local installations.
+DuckDB uses local files and does not require Docker.
 
 - **Image**: `postgres:15`
 - **Port**: `5433` (Mapped to 5432 in container to avoid local conflicts)
@@ -77,6 +78,7 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 - [x] **SQL Server Integration Test**: Create `tests/test_mssql_integration.py` using the Dockerized SQL Server Express database.
 - [x] **MariaDB Integration Test**: Create `tests/test_mariadb_integration.py` using the Dockerized MariaDB database.
 - [x] **CockroachDB Integration Test**: Create `tests/test_cockroach_integration.py` using the Dockerized CockroachDB database.
+- [x] **DuckDB Integration Test**: Create `tests/test_duckdb_integration.py` using local DuckDB database files.
 - [x] **Transaction Integration Test**: Create `tests/test_transaction_integration.py` for cross-dialect transaction APIs.
 - [x] **Upsert Integration Test**: Create `tests/test_upsert_integration.py` for `ON CONFLICT`/`ON DUPLICATE KEY UPDATE` behavior.
 - [x] **Write-Return Integration Test**: Create `tests/test_returning_integration.py` for `RETURNING`/`OUTPUT` behavior.
@@ -128,3 +130,8 @@ The tests themselves handle table creation and cleanup using `pytest` fixtures.
 
 - **Driver**: `psycopg` (required for CockroachDB integration tests).
 - **Default URL**: `postgresql://root@127.0.0.1:26258/buildaquery_test?sslmode=disable` (override with `COCKROACH_DATABASE_URL`).
+
+## DuckDB Details
+
+- **Driver**: `duckdb` (required for DuckDB integration tests).
+- **Database File**: `static/test-duckdb/*.duckdb` (created per test and cleaned by table teardown logic).

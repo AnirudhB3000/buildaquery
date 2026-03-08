@@ -2,6 +2,8 @@ from buildaquery import (
     __version__,
     CompiledQuery,
     ConnectionSettings,
+    DuckDbCompiler,
+    DuckDbExecutor,
     InMemoryMetricsAdapter,
     MySqlCompiler,
     ObservabilitySettings,
@@ -23,6 +25,8 @@ def test_root_public_api_exports_are_importable() -> None:
     assert ObservabilitySettings is not None
     assert InMemoryMetricsAdapter is not None
     assert CompiledQuery is not None
+    assert DuckDbCompiler is not None
+    assert DuckDbExecutor is not None
 
 
 def test_compiler_exports_include_compiled_query() -> None:

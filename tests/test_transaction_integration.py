@@ -20,6 +20,7 @@ from buildaquery.abstract_syntax_tree.models import (
     WhereClauseNode,
 )
 from buildaquery.execution.cockroachdb import CockroachExecutor
+from buildaquery.execution.duckdb import DuckDbExecutor
 from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.mssql import MsSqlExecutor
 from buildaquery.execution.mysql import MySqlExecutor
@@ -45,7 +46,7 @@ MSSQL_DATABASE_URL = os.getenv(
     "mssql://sa:Password%21@127.0.0.1:1434/buildaquery_test?driver=ODBC+Driver+18+for+SQL+Server&encrypt=no&trust_server_certificate=yes",
 )
 
-DIALECTS = ["postgres", "sqlite", "mysql", "mariadb", "cockroach", "oracle", "mssql"]
+DIALECTS = ["postgres", "sqlite", "mysql", "mariadb", "cockroach", "oracle", "mssql", "duckdb"]
 
 
 def _parse_mssql_url(url: str) -> dict[str, str | int | None]:
@@ -81,6 +82,11 @@ def _build_executor(dialect: str) -> Any:
         db_dir.mkdir(parents=True, exist_ok=True)
         db_path = db_dir / f"txn_{uuid4().hex}.sqlite"
         return SqliteExecutor(connection_info=str(db_path))
+    if dialect == "duckdb":
+        db_dir = Path("static") / "test-duckdb"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        db_path = db_dir / f"txn_{uuid4().hex}.duckdb"
+        return DuckDbExecutor(connection_info=str(db_path))
     raise ValueError(f"Unsupported dialect: {dialect}")
 
 
@@ -91,6 +97,8 @@ def _column_type_for_dialect(dialect: str) -> str:
         return "NVARCHAR(255)"
     if dialect == "cockroach":
         return "STRING"
+    if dialect == "duckdb":
+        return "VARCHAR"
     return "TEXT"
 
 
@@ -150,6 +158,7 @@ def _is_backend_unavailable_error(exc: Exception) -> bool:
         "connection attempt failed",
         "ssl provider",
         "encryption not supported on the client",
+        "'duckdb' library is required",
     ]
     return any(signal in text for signal in unavailable_signals)
 
@@ -228,11 +237,18 @@ def test_savepoint_rollback_keeps_prior_work(dialect: str):
         )
         executor.begin()
         executor.execute(_insert_row_stmt(table, 1, "keep"))
-        executor.savepoint("sp1")
-        executor.execute(_insert_row_stmt(table, 2, "discard"))
-        executor.rollback_to_savepoint("sp1")
-        executor.release_savepoint("sp1")
-        executor.commit()
+        try:
+            executor.savepoint("sp1")
+            executor.execute(_insert_row_stmt(table, 2, "discard"))
+            executor.rollback_to_savepoint("sp1")
+            executor.release_savepoint("sp1")
+            executor.commit()
+        except RuntimeError as exc:
+            if dialect == "duckdb" and "savepoints are not supported" in str(exc).lower():
+                executor.rollback()
+                assert _count_rows(executor, table) == 0
+                return
+            raise
 
         assert _count_rows(executor, table) == 1
         remaining_stmt = SelectStatementNode(

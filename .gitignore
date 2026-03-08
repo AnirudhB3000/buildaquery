@@ -5,3 +5,4 @@ GEMINI.md
 dist/
 static/test-sqlite/*
 .tmp/
+static/test-duckdb/*

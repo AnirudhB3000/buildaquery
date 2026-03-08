@@ -19,6 +19,7 @@ from buildaquery.abstract_syntax_tree.models import (
     WhereClauseNode,
 )
 from buildaquery.execution.cockroachdb import CockroachExecutor
+from buildaquery.execution.duckdb import DuckDbExecutor
 from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.mssql import MsSqlExecutor
 from buildaquery.execution.postgres import PostgresExecutor
@@ -40,9 +41,9 @@ COCKROACH_DATABASE_URL = os.getenv(
     "postgresql://root@127.0.0.1:26258/buildaquery_test?sslmode=disable",
 )
 
-INSERT_RETURNING_DIALECTS = ["postgres", "sqlite", "cockroach", "mariadb"]
-UPDATE_RETURNING_DIALECTS = ["postgres", "sqlite", "cockroach"]
-DELETE_RETURNING_DIALECTS = ["postgres", "sqlite", "cockroach", "mariadb"]
+INSERT_RETURNING_DIALECTS = ["postgres", "sqlite", "cockroach", "mariadb", "duckdb"]
+UPDATE_RETURNING_DIALECTS = ["postgres", "sqlite", "cockroach", "duckdb"]
+DELETE_RETURNING_DIALECTS = ["postgres", "sqlite", "cockroach", "mariadb", "duckdb"]
 OUTPUT_DIALECTS = ["mssql"]
 
 INSERT_SUPPORTED_DIALECTS = INSERT_RETURNING_DIALECTS + OUTPUT_DIALECTS
@@ -64,6 +65,11 @@ def _build_executor(dialect: str) -> Any:
         db_dir.mkdir(parents=True, exist_ok=True)
         db_path = db_dir / f"returning_{uuid4().hex}.sqlite"
         return SqliteExecutor(connection_info=str(db_path))
+    if dialect == "duckdb":
+        db_dir = Path("static") / "test-duckdb"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        db_path = db_dir / f"returning_{uuid4().hex}.duckdb"
+        return DuckDbExecutor(connection_info=str(db_path))
     raise ValueError(f"Unsupported dialect: {dialect}")
 
 
@@ -88,6 +94,7 @@ def _is_backend_unavailable_error(exc: Exception) -> bool:
         "connection attempt failed",
         "ssl provider",
         "encryption not supported on the client",
+        "'duckdb' library is required",
     ]
     return any(signal in text for signal in unavailable_signals)
 

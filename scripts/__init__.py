@@ -59,7 +59,7 @@ def clean_project():
     print("Cleanup complete.")
 
 def setup_tests():
-    """Prepare integration test dependencies (Postgres + MySQL + MariaDB + CockroachDB + Oracle + SQL Server + SQLite)."""
+    """Prepare integration test dependencies (Postgres + MySQL + MariaDB + CockroachDB + Oracle + SQL Server + SQLite + DuckDB)."""
     print("Starting Docker services for integration tests...")
     docker_result = subprocess.run(["docker-compose", "up", "-d"], check=False)
     if docker_result.returncode != 0:
@@ -72,6 +72,17 @@ def setup_tests():
     else:
         sqlite_script = os.path.join("scripts", "create_sqlite_db.sh")
         result = subprocess.run(["bash", sqlite_script], check=False)
+
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    print("Preparing DuckDB test directory...")
+    if os.name == "nt":
+        duckdb_script = os.path.join("scripts", "create_duckdb_dir.ps1")
+        result = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", duckdb_script], check=False)
+    else:
+        duckdb_script = os.path.join("scripts", "create_duckdb_dir.sh")
+        result = subprocess.run(["bash", duckdb_script], check=False)
 
     if result.returncode != 0:
         sys.exit(result.returncode)

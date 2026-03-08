@@ -83,6 +83,11 @@ A concrete implementation for MariaDB using `mariadb`.
 ### `CockroachExecutor`
 A concrete implementation for CockroachDB using `psycopg`.
 
+### `DuckDbExecutor`
+A concrete implementation for DuckDB using `duckdb`.
+
+DuckDB savepoint APIs are runtime-version dependent; when unsupported by the installed DuckDB runtime, the executor raises a clear `RuntimeError` for savepoint operations.
+
 ### `OracleExecutor`
 A concrete implementation for Oracle using `oracledb`.
 
@@ -232,6 +237,21 @@ executor = CockroachExecutor(connection_info="postgresql://root@localhost:26257/
 rows = executor.fetch_all(compiled)
 ```
 
+### DuckDB Example
+
+```python
+from buildaquery.execution.duckdb import DuckDbExecutor
+from buildaquery.compiler.compiled_query import CompiledQuery
+
+compiled = CompiledQuery(
+    sql="SELECT * FROM users WHERE age > ?",
+    params=[25]
+)
+
+executor = DuckDbExecutor(connection_info="static/test-duckdb/sample.duckdb")
+rows = executor.fetch_all(compiled)
+```
+
 ## Dependencies
 Different executors require specific database drivers:
 - `PostgresExecutor` requires `psycopg` (`pip install psycopg[binary]`).
@@ -241,3 +261,4 @@ Different executors require specific database drivers:
 - `MsSqlExecutor` requires `pyodbc` (`pip install pyodbc`).
 - `MariaDbExecutor` requires `mariadb` (`pip install mariadb`).
 - `CockroachExecutor` requires `psycopg` (`pip install psycopg[binary]`).
+- `DuckDbExecutor` requires `duckdb` (`pip install duckdb`).

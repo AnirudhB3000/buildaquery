@@ -129,6 +129,18 @@ The initial implementation supports PostgreSQL.
 - **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
 - **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and `ALTER TABLE` add/drop column + add/drop constraint.
 
+### DuckDB (`DuckDbCompiler`)
+
+#### Key Features:
+- **`?` Placeholders**: Uses DuckDB-compatible parameter style.
+- **Core AST Coverage**: Follows SQLite compiler behavior for supported syntax paths.
+- **TOP Translation**: Maps `TopClauseNode` to `LIMIT`, with optional implicit `ORDER BY`.
+- **Row Locking**: Raises `ValueError` for `lock_clause` because DuckDB does not support trailing `FOR UPDATE`/`FOR SHARE`.
+- **Upsert/Conflict Handling**: Supports `ON CONFLICT (...) DO NOTHING` and `ON CONFLICT (...) DO UPDATE`.
+- **Write-Return Payloads**: Supports `returning_clause` via `RETURNING` for `INSERT`/`UPDATE`/`DELETE`.
+- **Batch Inserts**: Supports multi-row payload compilation via `InsertStatementNode.rows`.
+- **DDL Extensions**: Supports table-level constraints, `CREATE INDEX`/`DROP INDEX`, and restricted `ALTER TABLE` actions.
+
 ## Usage Example
 
 ```python
@@ -139,6 +151,7 @@ from buildaquery.compiler.oracle.oracle_compiler import OracleCompiler
 from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
+from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
 
 compiler = PostgresCompiler()
 compiled = compiler.compile(ast_root)
@@ -174,5 +187,10 @@ print(compiled.params) # [123]
 cockroach_compiler = CockroachDbCompiler()
 compiled = cockroach_compiler.compile(ast_root)
 print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.params) # [123]
+
+duckdb_compiler = DuckDbCompiler()
+compiled = duckdb_compiler.compile(ast_root)
+print(compiled.sql)    # "SELECT * FROM users WHERE id = ?"
 print(compiled.params) # [123]
 ```

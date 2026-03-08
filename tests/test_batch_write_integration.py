@@ -17,6 +17,7 @@ from buildaquery.abstract_syntax_tree.models import (
     TableNode,
 )
 from buildaquery.execution.cockroachdb import CockroachExecutor
+from buildaquery.execution.duckdb import DuckDbExecutor
 from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.mssql import MsSqlExecutor
 from buildaquery.execution.mysql import MySqlExecutor
@@ -38,7 +39,8 @@ COCKROACH_DATABASE_URL = os.getenv(
     "postgresql://root@127.0.0.1:26258/buildaquery_test?sslmode=disable",
 )
 
-ALL_DIALECTS = ["postgres", "sqlite", "mysql", "mariadb", "cockroach", "oracle", "mssql"]
+ALL_DIALECTS = ["postgres", "sqlite", "mysql", "mariadb", "cockroach", "oracle", "mssql", "duckdb"]
+
 
 
 def _build_executor(dialect: str) -> Any:
@@ -59,6 +61,11 @@ def _build_executor(dialect: str) -> Any:
         return OracleExecutor(connection_info=ORACLE_DATABASE_URL)
     if dialect == "mssql":
         return MsSqlExecutor(connection_info=MSSQL_DATABASE_URL)
+    if dialect == "duckdb":
+        db_dir = Path("static") / "test-duckdb"
+        db_dir.mkdir(parents=True, exist_ok=True)
+        db_path = db_dir / f"batch_{uuid4().hex}.duckdb"
+        return DuckDbExecutor(connection_info=str(db_path))
     raise ValueError(f"Unsupported dialect: {dialect}")
 
 
@@ -85,6 +92,7 @@ def _is_backend_unavailable_error(exc: Exception) -> bool:
         "encryption not supported on the client",
         "login timeout expired",
         "tns:",
+        "'duckdb' library is required",
     ]
     return any(signal in text for signal in unavailable_signals)
 
@@ -143,7 +151,7 @@ def _count_rows(executor: Any, table: TableNode) -> int:
 def _insert_template_for_dialect(dialect: str, table_name: str) -> str:
     if dialect in {"postgres", "mysql", "cockroach"}:
         return f"INSERT INTO {table_name} (id, value) VALUES (%s, %s)"
-    if dialect in {"sqlite", "mariadb", "mssql"}:
+    if dialect in {"sqlite", "mariadb", "mssql", "duckdb"}:
         return f"INSERT INTO {table_name} (id, value) VALUES (?, ?)"
     if dialect == "oracle":
         return f"INSERT INTO {table_name} (id, value) VALUES (:1, :2)"

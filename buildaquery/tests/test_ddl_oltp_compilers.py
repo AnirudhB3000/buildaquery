@@ -19,6 +19,7 @@ from buildaquery.abstract_syntax_tree.models import (
     UniqueConstraintNode,
 )
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
+from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
 from buildaquery.compiler.mssql.mssql_compiler import MsSqlCompiler
 from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
@@ -33,6 +34,7 @@ COMPILERS = [
     MySqlCompiler,
     MariaDbCompiler,
     CockroachDbCompiler,
+    DuckDbCompiler,
     OracleCompiler,
     MsSqlCompiler,
 ]
