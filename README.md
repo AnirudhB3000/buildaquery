@@ -14,7 +14,8 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Rich Expression Logic**: Includes `CASE` expressions, `IN`, `BETWEEN`, and type casting.
 - **Expanded DDL Support**: Table-level constraints (`PRIMARY KEY`, `UNIQUE`, `FOREIGN KEY`, `CHECK`), index statements (`CREATE INDEX`/`DROP INDEX`), and `ALTER TABLE` action paths.
 - **Visitor Pattern Traversal**: Extensible architecture for analysis and compilation.
-- **Secure Compilation**: Automatic parameterization to prevent SQL injection.
+- **Secure Compilation**: Automatic parameterization for values plus compiler-side validation for table/schema/column/alias identifiers.
+- **Raw SQL Guardrails**: `execute_raw(...)` can be policy-gated with `raw_sql_policy` (`allow`, `deny_untrusted`, `deny_all`) and explicit `trusted=True`.
 - **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `duckdb` (DuckDB), `clickhouse-driver` (ClickHouse), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 - **Transaction APIs**: First-class transaction control with `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, and `release_savepoint()` across executors.
 - **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
@@ -38,6 +39,7 @@ The project includes first-class OLTP-oriented support across AST, compiler, exe
 - **Observability hooks**: per-query timing (`query_observer`) and lifecycle logging events (`event_observer`) using `ObservabilitySettings`.
   - Built-in JSON logger helper: `make_json_event_logger(logger=...)` for one-line structured event logs.
   - Built-in adapters: `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
+- **Raw SQL guardrails**: set `raw_sql_policy="deny_untrusted"` (or `"deny_all"`) to restrict `execute_raw(...)`; allow vetted calls with `trusted=True`.
 - **OLTP integration coverage**: contention/retry correctness, deadlock normalization, lost-update prevention, isolation visibility semantics, and lock behavior validation.
 
 ## Dialect Notes

@@ -275,8 +275,9 @@ def test_compile_ddl(compiler):
     )
     compiled_create = compiler.compile(create_query)
     assert "IF NOT EXISTS (SELECT 1 FROM sys.tables" in compiled_create.sql
+    assert "WHERE name = ? AND schema_id = SCHEMA_ID(?)" in compiled_create.sql
     assert "CREATE TABLE users" in compiled_create.sql
-    assert compiled_create.params == [18]
+    assert compiled_create.params == [18, "users", "dbo"]
 
     drop_query = DropStatementNode(
         table=TableNode(name="users"),
@@ -294,6 +295,18 @@ def test_compile_drop_cascade_error(compiler):
     )
     with pytest.raises(ValueError, match="SQL Server does not support CASCADE in DROP TABLE"):
         compiler.compile(drop_query)
+
+
+def test_compile_ddl_if_not_exists_parameterizes_identifier_check(compiler):
+    injected_name = "users'; DROP TABLE audit_log;--"
+    create_query = CreateStatementNode(
+        table=TableNode(name=injected_name, schema="dbo"),
+        columns=[ColumnDefinitionNode(name="id", data_type="INT")],
+        if_not_exists=True,
+    )
+
+    with pytest.raises(ValueError, match="Unsafe SQL Server table name"):
+        compiler.compile(create_query)
 
 def test_compile_where_with_params(compiler):
     query = SelectStatementNode(

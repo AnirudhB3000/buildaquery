@@ -5,7 +5,7 @@ import re
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 from buildaquery.compiler.compiled_query import CompiledQuery
-from buildaquery.execution.base import Executor
+from buildaquery.execution.base import Executor, RawSqlPolicy
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
 from buildaquery.execution.observability import ObservabilitySettings
 
@@ -28,6 +28,7 @@ class ClickHouseExecutor(Executor):
         acquire_connection: ConnectionAcquireHook | None = None,
         release_connection: ConnectionReleaseHook | None = None,
         observability_settings: ObservabilitySettings | None = None,
+        raw_sql_policy: RawSqlPolicy = "allow",
     ) -> None:
         if connection_info is None and connection is None and acquire_connection is None:
             raise ValueError("Provide connection_info, connection, or acquire_connection.")
@@ -41,6 +42,7 @@ class ClickHouseExecutor(Executor):
             release_connection=release_connection,
         )
         self.observability_settings = observability_settings or ObservabilitySettings()
+        self.raw_sql_policy = self._validate_raw_sql_policy(raw_sql_policy)
         self._clickhouse_dbapi = None
         self._closed = False
 
@@ -269,7 +271,8 @@ class ClickHouseExecutor(Executor):
         finally:
             self._release_connection(conn, release_mode)
 
-    def execute_raw(self, sql: str, params: Sequence[Any] | None = None) -> None:
+    def execute_raw(self, sql: str, params: Sequence[Any] | None = None, *, trusted: bool = False) -> None:
+        self._enforce_execute_raw_policy(sql=sql, trusted=trusted)
         self._observe_query(
             operation="execute_raw",
             sql=sql,

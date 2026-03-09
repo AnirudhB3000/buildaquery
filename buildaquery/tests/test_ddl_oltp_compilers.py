@@ -86,7 +86,10 @@ def test_create_table_with_table_constraints_compiles(compiler_type) -> None:
     assert "UNIQUE (tenant_id, customer_id)" in compiled.sql
     assert "FOREIGN KEY (customer_id) REFERENCES customers (id)" in compiled.sql
     assert "CHECK ((qty > tenant_id))" in compiled.sql
-    assert compiled.params == []
+    if compiler_type is MsSqlCompiler:
+        assert compiled.params == ["orders", "dbo"]
+    else:
+        assert compiled.params == []
 
 
 @pytest.mark.parametrize("compiler_type", [PostgresCompiler, SqliteCompiler, CockroachDbCompiler])

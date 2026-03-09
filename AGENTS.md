@@ -195,6 +195,17 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added unit and SQLite boundary integration tests for validation success/failure behavior.
     *   Updated user/developer docs and examples with optional install/use path (`buildaquery[validation]`, `examples/sample_validation.py`).
     *   **Important downstream maintenance**: keep validation logic at external boundaries; when adding new external input shapes, add corresponding model, translator, tests, and docs without coupling Pydantic into AST/compiler/executor cores.
+*   **Raw SQL Policy Guardrails (`execute_raw`)**:
+    *   Added executor-level `raw_sql_policy` controls across all dialect executors: `allow` (default), `deny_untrusted`, and `deny_all`.
+    *   Extended `execute_raw` signature with `trusted: bool = False`; when policy requires trust, calls must pass `trusted=True`.
+    *   Added centralized enforcement in the base executor, emitting `security.execute_raw.blocked` lifecycle events and raising `ProgrammingExecutionError` on blocked calls.
+    *   Added unit and SQLite integration coverage for policy behavior and blocked-event emission.
+    *   **Important downstream maintenance**: for any new executor, wire `raw_sql_policy` initialization and `execute_raw(..., trusted=...)` enforcement consistently, and extend security tests/docs together.
+*   **Cross-Dialect Identifier Injection Hardening**:
+    *   Added shared compiler identifier validation and wired it across PostgreSQL, SQLite, MySQL, MariaDB, CockroachDB, Oracle, SQL Server, DuckDB, and ClickHouse compiler paths.
+    *   Hardened table/schema/column/alias handling in select/cte/subquery/table/ddl constraint/index/drop-column compilation paths to reject unsafe identifiers.
+    *   Added cross-dialect hostile-input tests to verify unsafe identifiers are rejected and valid expressions like `COUNT(*)` continue to compile.
+    *   **Important downstream maintenance**: when adding new compiler-emitted identifier fields, route them through identifier validation and extend `test_compiler_identifier_security.py`.
 
 ---
 
@@ -225,3 +236,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   **Downstream changes**: any additional updates needed because of this change.
     *   **Goal alignment**: how the change achieves the conversation goal.
 *   Only write edits to files after explicit user approval.
+
+### Security-First Update Requirement
+*   For **all future updates**, perform a security analysis as part of the change.
+*   If a security issue is found, prioritize catching and fixing it quickly in the same update scope whenever feasible.
+*   Add appropriate security-focused tests (unit and/or integration) that verify both:
+    *   vulnerable input is rejected/neutralized, and
+    *   safe/expected behavior remains intact.

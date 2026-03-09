@@ -1,6 +1,7 @@
 from typing import Any
 
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.compiler.identifier_validation import validate_identifier
 from buildaquery.abstract_syntax_tree.models import (
     ASTNode,
     SelectStatementNode,
@@ -63,6 +64,12 @@ class MySqlCompiler(Visitor):
 
     def __init__(self) -> None:
         self._params: list[Any] = []
+
+    def _validate_identifier(self, identifier: str, *, kind: str) -> str:
+        return validate_identifier(identifier, kind=kind)
+
+    def _validate_column_identifier(self, identifier: str, *, kind: str = "column name") -> str:
+        return validate_identifier(identifier, kind=kind, allow_column_expression=True)
 
     def compile(self, node: ASTNode) -> CompiledQuery:
         """
@@ -139,7 +146,8 @@ class MySqlCompiler(Visitor):
         """
         Compiles a CTE (name AS (subquery)).
         """
-        return f"{node.name} AS ({self.visit(node.subquery)})"
+        cte_name = self._validate_identifier(node.name, kind="cte name")
+        return f"{cte_name} AS ({self.visit(node.subquery)})"
 
     def visit_DeleteStatementNode(self, node: DeleteStatementNode) -> str:
         """
@@ -159,7 +167,7 @@ class MySqlCompiler(Visitor):
         table = self.visit(node.table)
         cols = ""
         if node.columns:
-            cols = f" ({', '.join([c.name for c in node.columns])})"
+            cols = f" ({', '.join([self._validate_column_identifier(c.name) for c in node.columns])})"
 
         values_sql = self._compile_insert_values(node)
         sql = f"INSERT INTO {table}{cols} {values_sql}"
@@ -204,7 +212,12 @@ class MySqlCompiler(Visitor):
         if not clause.update_columns:
             raise ValueError("MySQL upsert requires update_columns.")
 
-        updates = ", ".join([f"{col} = VALUES({col})" for col in clause.update_columns])
+        updates = ", ".join(
+            [
+                f"{self._validate_column_identifier(col)} = VALUES({self._validate_column_identifier(col)})"
+                for col in clause.update_columns
+            ]
+        )
         return f"ON DUPLICATE KEY UPDATE {updates}"
 
     def visit_UpdateStatementNode(self, node: UpdateStatementNode) -> str:
@@ -212,7 +225,9 @@ class MySqlCompiler(Visitor):
         Compiles an UPDATE statement.
         """
         table = self.visit(node.table)
-        sets = ", ".join([f"{col} = {self.visit(expr)}" for col, expr in node.set_clauses.items()])
+        sets = ", ".join(
+            [f"{self._validate_column_identifier(col)} = {self.visit(expr)}" for col, expr in node.set_clauses.items()]
+        )
 
         parts = [f"UPDATE {table} SET {sets}"]
         if node.where_clause:
@@ -238,7 +253,7 @@ class MySqlCompiler(Visitor):
         """
         Compiles a column definition.
         """
-        parts = [node.name, node.data_type]
+        parts = [self._validate_column_identifier(node.name), node.data_type]
         if node.primary_key:
             parts.append("PRIMARY KEY")
         if node.not_null:
@@ -264,7 +279,8 @@ class MySqlCompiler(Visitor):
             raise ValueError("CREATE INDEX requires at least one column.")
         unique = "UNIQUE " if node.unique else ""
         cols = ", ".join([self.visit(column) for column in node.columns])
-        return f"CREATE {unique}INDEX {node.name} ON {self.visit(node.table)} ({cols})"
+        index_name = self._validate_identifier(node.name, kind="index name")
+        return f"CREATE {unique}INDEX {index_name} ON {self.visit(node.table)} ({cols})"
 
     def visit_DropIndexStatementNode(self, node: DropIndexStatementNode) -> str:
         if node.if_exists:
@@ -273,7 +289,8 @@ class MySqlCompiler(Visitor):
             raise ValueError("MySQL does not support CASCADE in DROP INDEX.")
         if node.table is None:
             raise ValueError("MySQL DROP INDEX requires a table.")
-        return f"DROP INDEX {node.name} ON {self.visit(node.table)}"
+        index_name = self._validate_identifier(node.name, kind="index name")
+        return f"DROP INDEX {index_name} ON {self.visit(node.table)}"
 
     def visit_AlterTableStatementNode(self, node: AlterTableStatementNode) -> str:
         if not node.actions:
@@ -305,9 +322,11 @@ class MySqlCompiler(Visitor):
     # --------------------------------------------------
 
     def visit_ColumnNode(self, node: ColumnNode) -> str:
+        column_name = self._validate_column_identifier(node.name)
         if node.table:
-            return f"{node.table}.{node.name}"
-        return node.name
+            table_name = self._validate_identifier(node.table, kind="table name")
+            return f"{table_name}.{column_name}"
+        return column_name
 
     def visit_LiteralNode(self, node: LiteralNode) -> str:
         """
@@ -325,7 +344,8 @@ class MySqlCompiler(Visitor):
         return "*"
 
     def visit_AliasNode(self, node: AliasNode) -> str:
-        return f"{self.visit(node.expression)} AS {node.name}"
+        alias_name = self._validate_identifier(node.name, kind="alias")
+        return f"{self.visit(node.expression)} AS {alias_name}"
 
     def visit_CastNode(self, node: CastNode) -> str:
         return f"CAST({self.visit(node.expression)} AS {node.data_type})"
@@ -398,7 +418,8 @@ class MySqlCompiler(Visitor):
         """
         sql = f"({self.visit(node.statement)})"
         if node.alias:
-            sql += f" AS {node.alias}"
+            alias_name = self._validate_identifier(node.alias, kind="alias")
+            sql += f" AS {alias_name}"
         return sql
 
     # --------------------------------------------------
@@ -406,11 +427,13 @@ class MySqlCompiler(Visitor):
     # --------------------------------------------------
 
     def visit_TableNode(self, node: TableNode) -> str:
-        name = node.name
+        name = self._validate_identifier(node.name, kind="table name")
         if node.schema:
-            name = f"{node.schema}.{name}"
+            schema_name = self._validate_identifier(node.schema, kind="schema name")
+            name = f"{schema_name}.{name}"
         if node.alias:
-            name = f"{name} AS {node.alias}"
+            alias_name = self._validate_identifier(node.alias, kind="alias")
+            name = f"{name} AS {alias_name}"
         return name
 
     def visit_JoinClauseNode(self, node: JoinClauseNode) -> str:
@@ -450,16 +473,24 @@ class MySqlCompiler(Visitor):
         columns = node.columns or []
         if not columns:
             raise ValueError("PRIMARY KEY constraint requires at least one column.")
-        cols = ", ".join([column.name for column in columns])
-        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        cols = ", ".join([self._validate_column_identifier(column.name) for column in columns])
+        prefix = (
+            f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')} "
+            if node.name
+            else ""
+        )
         return f"{prefix}PRIMARY KEY ({cols})"
 
     def visit_UniqueConstraintNode(self, node: UniqueConstraintNode) -> str:
         columns = node.columns or []
         if not columns:
             raise ValueError("UNIQUE constraint requires at least one column.")
-        cols = ", ".join([column.name for column in columns])
-        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        cols = ", ".join([self._validate_column_identifier(column.name) for column in columns])
+        prefix = (
+            f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')} "
+            if node.name
+            else ""
+        )
         return f"{prefix}UNIQUE ({cols})"
 
     def visit_ForeignKeyConstraintNode(self, node: ForeignKeyConstraintNode) -> str:
@@ -469,11 +500,11 @@ class MySqlCompiler(Visitor):
             raise ValueError("FOREIGN KEY constraint requires columns, reference_table, and reference_columns.")
         if len(columns) != len(reference_columns):
             raise ValueError("FOREIGN KEY columns and reference_columns must have the same length.")
-        cols = ", ".join([column.name for column in columns])
-        ref_cols = ", ".join([column.name for column in reference_columns])
+        cols = ", ".join([self._validate_column_identifier(column.name) for column in columns])
+        ref_cols = ", ".join([self._validate_column_identifier(column.name) for column in reference_columns])
         parts = []
         if node.name:
-            parts.append(f"CONSTRAINT {node.name}")
+            parts.append(f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')}")
         parts.append(f"FOREIGN KEY ({cols}) REFERENCES {self.visit(node.reference_table)} ({ref_cols})")
         if node.on_delete:
             parts.append(f"ON DELETE {node.on_delete}")
@@ -484,7 +515,11 @@ class MySqlCompiler(Visitor):
     def visit_CheckConstraintNode(self, node: CheckConstraintNode) -> str:
         if node.condition is None:
             raise ValueError("CHECK constraint requires a condition.")
-        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        prefix = (
+            f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')} "
+            if node.name
+            else ""
+        )
         return f"{prefix}CHECK ({self.visit(node.condition)})"
 
     def visit_AddColumnActionNode(self, node: AddColumnActionNode) -> str:
@@ -493,7 +528,8 @@ class MySqlCompiler(Visitor):
     def visit_DropColumnActionNode(self, node: DropColumnActionNode) -> str:
         if node.if_exists:
             raise ValueError("MySQL does not support IF EXISTS for DROP COLUMN.")
-        return f"DROP COLUMN {node.column_name}"
+        column_name = self._validate_column_identifier(node.column_name)
+        return f"DROP COLUMN {column_name}"
 
     def visit_AddConstraintActionNode(self, node: AddConstraintActionNode) -> str:
         return f"ADD {self.visit(node.constraint)}"

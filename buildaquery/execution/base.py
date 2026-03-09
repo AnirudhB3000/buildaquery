@@ -1,12 +1,20 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence
 from uuid import uuid4
 from buildaquery.compiler.compiled_query import CompiledQuery
-from buildaquery.execution.errors import ExecutionError, TransientExecutionError, normalize_execution_error
+from buildaquery.execution.errors import (
+    ExecutionError,
+    ExecutionErrorDetails,
+    ProgrammingExecutionError,
+    TransientExecutionError,
+    normalize_execution_error,
+)
 from buildaquery.execution.observability import ExecutionEvent, ObservabilitySettings, QueryObservation
 from buildaquery.execution.retry import RetryPolicy, run_with_retry
+
+RawSqlPolicy = Literal["allow", "deny_untrusted", "deny_all"]
 
 # ==================================================
 # Base Executor
@@ -90,6 +98,42 @@ class Executor(ABC):
     # ==================================================
     # Normalized Error + Retry Helpers
     # ==================================================
+
+    def _validate_raw_sql_policy(self, raw_sql_policy: str) -> RawSqlPolicy:
+        allowed: tuple[str, ...] = ("allow", "deny_untrusted", "deny_all")
+        if raw_sql_policy not in allowed:
+            raise ValueError(f"Invalid raw_sql_policy {raw_sql_policy!r}. Expected one of: {', '.join(allowed)}")
+        return raw_sql_policy
+
+    def _enforce_execute_raw_policy(self, *, sql: str, trusted: bool) -> None:
+        _ = sql
+        policy = self._validate_raw_sql_policy(getattr(self, "raw_sql_policy", "allow"))
+        if policy == "allow":
+            return
+
+        blocked = policy == "deny_all" or (policy == "deny_untrusted" and not trusted)
+        if not blocked:
+            return
+
+        reason = (
+            "execute_raw is disabled by raw_sql_policy='deny_all'"
+            if policy == "deny_all"
+            else "execute_raw requires trusted=True when raw_sql_policy='deny_untrusted'"
+        )
+        self._emit_event(
+            "security.execute_raw.blocked",
+            success=False,
+            operation="execute_raw",
+            error_type="ProgrammingExecutionError",
+            error_message=reason,
+        )
+        details = ExecutionErrorDetails(
+            dialect=self._dialect_name(),
+            operation="execute_raw",
+            sqlstate=None,
+            original_message=reason,
+        )
+        raise ProgrammingExecutionError(details, ValueError(reason))
 
     def _next_query_id(self) -> str:
         return uuid4().hex

@@ -4,7 +4,7 @@ This guide is a concise, user-focused reference for installing Build-a-Query, bu
 
 ## What It Is
 
-Build-a-Query is a Python query builder that uses an Abstract Syntax Tree (AST) to generate parameterized SQL safely across multiple databases.
+Build-a-Query is a Python query builder that uses an Abstract Syntax Tree (AST) to generate parameterized SQL safely across multiple databases, with compiler-side identifier validation for table/schema/column/alias names.
 
 Supported dialects:
 - PostgreSQL
@@ -57,6 +57,7 @@ Optional resilience path:
 7. For immediate log visibility, wire `event_observer` with `make_json_event_logger(logger=...)`.
 8. For built-in telemetry in-process, use `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
 9. If input comes from external sources, validate it first with the optional `buildaquery.validation` models/translators.
+10. If your app must block ad-hoc raw SQL, set `raw_sql_policy="deny_untrusted"` or `raw_sql_policy="deny_all"` on executors.
 
 ## Optional Boundary Validation
 
@@ -81,6 +82,31 @@ validated_query = RawExecutionRequestModel(
 
 connection_kwargs = to_connection_settings_kwargs(validated_config)
 sql, params = to_raw_execution_payload(validated_query)
+```
+
+## Raw SQL Guardrails
+
+`execute_raw(...)` is an explicit escape hatch. By default it is allowed, but you can enforce safer runtime boundaries with executor policy:
+
+- `raw_sql_policy="allow"`: current/default behavior.
+- `raw_sql_policy="deny_untrusted"`: blocks `execute_raw(...)` unless `trusted=True` is passed.
+- `raw_sql_policy="deny_all"`: blocks `execute_raw(...)` always.
+
+Example:
+
+```python
+from buildaquery.execution.sqlite import SqliteExecutor
+
+executor = SqliteExecutor(
+    connection_info="static/test-sqlite/db.sqlite",
+    raw_sql_policy="deny_untrusted",
+)
+
+# blocked (raises ProgrammingExecutionError)
+# executor.execute_raw("CREATE TABLE t (id INTEGER PRIMARY KEY)")
+
+# allowed explicit trusted call
+executor.execute_raw("CREATE TABLE t (id INTEGER PRIMARY KEY)", trusted=True)
 ```
 
 ## OLTP Features

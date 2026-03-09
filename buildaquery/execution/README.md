@@ -40,6 +40,15 @@ If `acquire_connection` is provided, executor operations use pooled connections 
 
 For untrusted external payloads (API/CLI/job/env), validate before executor construction/calls using the optional `buildaquery.validation` package (Pydantic-backed). This keeps executor internals lightweight while enforcing boundary checks.
 
+### Raw SQL Guardrails
+
+All executors accept `raw_sql_policy`:
+- `allow` (default): `execute_raw(...)` is permitted.
+- `deny_untrusted`: `execute_raw(...)` requires `trusted=True`.
+- `deny_all`: blocks all `execute_raw(...)` calls.
+
+When blocked, executors raise `ProgrammingExecutionError` and emit `security.execute_raw.blocked` lifecycle events.
+
 ### Observability Hooks
 
 All executors support observability through `ObservabilitySettings`:
@@ -59,6 +68,7 @@ Lifecycle event names:
 - `txn.begin`, `txn.commit`, `txn.rollback`
 - `txn.savepoint.create`, `txn.savepoint.rollback`, `txn.savepoint.release`
 - `connection.acquire.start`, `connection.acquire.end`, `connection.release`, `connection.close`
+- `security.execute_raw.blocked`
 
 ### Normalized Error Types
 

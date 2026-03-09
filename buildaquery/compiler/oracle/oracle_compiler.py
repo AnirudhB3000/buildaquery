@@ -1,6 +1,7 @@
 from typing import Any
 
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.compiler.identifier_validation import validate_identifier
 from buildaquery.abstract_syntax_tree.models import (
     ASTNode,
     SelectStatementNode,
@@ -64,6 +65,12 @@ class OracleCompiler(Visitor):
 
     def __init__(self) -> None:
         self._params: list[Any] = []
+
+    def _validate_identifier(self, identifier: str, *, kind: str) -> str:
+        return validate_identifier(identifier, kind=kind)
+
+    def _validate_column_identifier(self, identifier: str, *, kind: str = "column name") -> str:
+        return validate_identifier(identifier, kind=kind, allow_column_expression=True)
 
     def compile(self, node: ASTNode) -> CompiledQuery:
         """
@@ -141,7 +148,8 @@ class OracleCompiler(Visitor):
         """
         Compiles a CTE (name AS (subquery)).
         """
-        return f"{node.name} AS ({self.visit(node.subquery)})"
+        cte_name = self._validate_identifier(node.name, kind="cte name")
+        return f"{cte_name} AS ({self.visit(node.subquery)})"
 
     def visit_DeleteStatementNode(self, node: DeleteStatementNode) -> str:
         """
@@ -168,7 +176,7 @@ class OracleCompiler(Visitor):
         table = self.visit(node.table)
         cols = ""
         if node.columns:
-            cols = f" ({', '.join([c.name for c in node.columns])})"
+            cols = f" ({', '.join([self._validate_column_identifier(c.name) for c in node.columns])})"
 
         values_sql = self._compile_insert_values(node, table, cols)
         if values_sql.startswith("ALL "):
@@ -222,11 +230,16 @@ class OracleCompiler(Visitor):
 
         parts = [f"MERGE INTO {table} target USING ({source_sql}) source ON {on_sql}"]
         if clause.update_columns:
-            updates = ", ".join([f"target.{col} = source.{col}" for col in clause.update_columns])
+            updates = ", ".join(
+                [
+                    f"target.{self._validate_column_identifier(col)} = source.{self._validate_column_identifier(col)}"
+                    for col in clause.update_columns
+                ]
+            )
             parts.append(f"WHEN MATCHED THEN UPDATE SET {updates}")
 
-        insert_cols = ", ".join([column.name for column in node.columns])
-        insert_vals = ", ".join([f"source.{column.name}" for column in node.columns])
+        insert_cols = ", ".join([self._validate_column_identifier(column.name) for column in node.columns])
+        insert_vals = ", ".join([f"source.{self._validate_column_identifier(column.name)}" for column in node.columns])
         parts.append(f"WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})")
         return " ".join(parts)
 
@@ -239,7 +252,7 @@ class OracleCompiler(Visitor):
             raise ValueError("Insert columns and values must have the same length.")
 
         source_items = [
-            f"{self.visit(value)} {column.name}"
+            f"{self.visit(value)} {self._validate_column_identifier(column.name)}"
             for column, value in zip(node.columns, node.values)
         ]
         return f"SELECT {', '.join(source_items)} FROM dual"
@@ -247,7 +260,10 @@ class OracleCompiler(Visitor):
     def _compile_merge_on(self, target: ConflictTargetNode) -> str:
         if not target.columns:
             raise ValueError("conflict_target must include at least one column.")
-        clauses = [f"target.{column.name} = source.{column.name}" for column in target.columns]
+        clauses = [
+            f"target.{self._validate_column_identifier(column.name)} = source.{self._validate_column_identifier(column.name)}"
+            for column in target.columns
+        ]
         return f"({' AND '.join(clauses)})"
 
     def visit_UpdateStatementNode(self, node: UpdateStatementNode) -> str:
@@ -255,7 +271,9 @@ class OracleCompiler(Visitor):
         Compiles an UPDATE statement.
         """
         table = self.visit(node.table)
-        sets = ", ".join([f"{col} = {self.visit(expr)}" for col, expr in node.set_clauses.items()])
+        sets = ", ".join(
+            [f"{self._validate_column_identifier(col)} = {self.visit(expr)}" for col, expr in node.set_clauses.items()]
+        )
 
         parts = [f"UPDATE {table} SET {sets}"]
         if node.where_clause:
@@ -282,7 +300,7 @@ class OracleCompiler(Visitor):
         """
         Compiles a column definition.
         """
-        parts = [node.name, node.data_type]
+        parts = [self._validate_column_identifier(node.name), node.data_type]
         if node.primary_key:
             parts.append("PRIMARY KEY")
         if node.not_null:
@@ -308,14 +326,16 @@ class OracleCompiler(Visitor):
             raise ValueError("CREATE INDEX requires at least one column.")
         unique = "UNIQUE " if node.unique else ""
         cols = ", ".join([self.visit(column) for column in node.columns])
-        return f"CREATE {unique}INDEX {node.name} ON {self.visit(node.table)} ({cols})"
+        index_name = self._validate_identifier(node.name, kind="index name")
+        return f"CREATE {unique}INDEX {index_name} ON {self.visit(node.table)} ({cols})"
 
     def visit_DropIndexStatementNode(self, node: DropIndexStatementNode) -> str:
         if node.if_exists:
             raise ValueError("Oracle does not support IF EXISTS in DROP INDEX.")
         if node.cascade:
             raise ValueError("Oracle does not support CASCADE in DROP INDEX.")
-        return f"DROP INDEX {node.name}"
+        index_name = self._validate_identifier(node.name, kind="index name")
+        return f"DROP INDEX {index_name}"
 
     def visit_AlterTableStatementNode(self, node: AlterTableStatementNode) -> str:
         if not node.actions:
@@ -353,9 +373,11 @@ class OracleCompiler(Visitor):
     # --------------------------------------------------
 
     def visit_ColumnNode(self, node: ColumnNode) -> str:
+        column_name = self._validate_column_identifier(node.name)
         if node.table:
-            return f"{node.table}.{node.name}"
-        return node.name
+            table_name = self._validate_identifier(node.table, kind="table name")
+            return f"{table_name}.{column_name}"
+        return column_name
 
     def visit_LiteralNode(self, node: LiteralNode) -> str:
         """
@@ -373,7 +395,8 @@ class OracleCompiler(Visitor):
         return "*"
 
     def visit_AliasNode(self, node: AliasNode) -> str:
-        return f"{self.visit(node.expression)} AS {node.name}"
+        alias_name = self._validate_identifier(node.name, kind="alias")
+        return f"{self.visit(node.expression)} AS {alias_name}"
 
     def visit_CastNode(self, node: CastNode) -> str:
         return f"CAST({self.visit(node.expression)} AS {node.data_type})"
@@ -446,7 +469,8 @@ class OracleCompiler(Visitor):
         """
         sql = f"({self.visit(node.statement)})"
         if node.alias:
-            sql += f" {node.alias}"
+            alias_name = self._validate_identifier(node.alias, kind="alias")
+            sql += f" {alias_name}"
         return sql
 
     # --------------------------------------------------
@@ -454,11 +478,13 @@ class OracleCompiler(Visitor):
     # --------------------------------------------------
 
     def visit_TableNode(self, node: TableNode) -> str:
-        name = node.name
+        name = self._validate_identifier(node.name, kind="table name")
         if node.schema:
-            name = f"{node.schema}.{name}"
+            schema_name = self._validate_identifier(node.schema, kind="schema name")
+            name = f"{schema_name}.{name}"
         if node.alias:
-            name = f"{name} {node.alias}"
+            alias_name = self._validate_identifier(node.alias, kind="alias")
+            name = f"{name} {alias_name}"
         return name
 
     def visit_JoinClauseNode(self, node: JoinClauseNode) -> str:
@@ -498,16 +524,24 @@ class OracleCompiler(Visitor):
         columns = node.columns or []
         if not columns:
             raise ValueError("PRIMARY KEY constraint requires at least one column.")
-        cols = ", ".join([column.name for column in columns])
-        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        cols = ", ".join([self._validate_column_identifier(column.name) for column in columns])
+        prefix = (
+            f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')} "
+            if node.name
+            else ""
+        )
         return f"{prefix}PRIMARY KEY ({cols})"
 
     def visit_UniqueConstraintNode(self, node: UniqueConstraintNode) -> str:
         columns = node.columns or []
         if not columns:
             raise ValueError("UNIQUE constraint requires at least one column.")
-        cols = ", ".join([column.name for column in columns])
-        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        cols = ", ".join([self._validate_column_identifier(column.name) for column in columns])
+        prefix = (
+            f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')} "
+            if node.name
+            else ""
+        )
         return f"{prefix}UNIQUE ({cols})"
 
     def visit_ForeignKeyConstraintNode(self, node: ForeignKeyConstraintNode) -> str:
@@ -517,11 +551,11 @@ class OracleCompiler(Visitor):
             raise ValueError("FOREIGN KEY constraint requires columns, reference_table, and reference_columns.")
         if len(columns) != len(reference_columns):
             raise ValueError("FOREIGN KEY columns and reference_columns must have the same length.")
-        cols = ", ".join([column.name for column in columns])
-        ref_cols = ", ".join([column.name for column in reference_columns])
+        cols = ", ".join([self._validate_column_identifier(column.name) for column in columns])
+        ref_cols = ", ".join([self._validate_column_identifier(column.name) for column in reference_columns])
         parts = []
         if node.name:
-            parts.append(f"CONSTRAINT {node.name}")
+            parts.append(f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')}")
         parts.append(f"FOREIGN KEY ({cols}) REFERENCES {self.visit(node.reference_table)} ({ref_cols})")
         if node.on_delete:
             parts.append(f"ON DELETE {node.on_delete}")
@@ -530,7 +564,11 @@ class OracleCompiler(Visitor):
     def visit_CheckConstraintNode(self, node: CheckConstraintNode) -> str:
         if node.condition is None:
             raise ValueError("CHECK constraint requires a condition.")
-        prefix = f"CONSTRAINT {node.name} " if node.name else ""
+        prefix = (
+            f"CONSTRAINT {self._validate_identifier(node.name, kind='constraint name')} "
+            if node.name
+            else ""
+        )
         return f"{prefix}CHECK ({self.visit(node.condition)})"
 
     def visit_AddColumnActionNode(self, node: AddColumnActionNode) -> str:
@@ -539,7 +577,8 @@ class OracleCompiler(Visitor):
     def visit_DropColumnActionNode(self, node: DropColumnActionNode) -> str:
         if node.if_exists:
             raise ValueError("Oracle does not support IF EXISTS for DROP COLUMN.")
-        return f"DROP COLUMN {node.column_name}"
+        column_name = self._validate_column_identifier(node.column_name)
+        return f"DROP COLUMN {column_name}"
 
     def visit_AddConstraintActionNode(self, node: AddConstraintActionNode) -> str:
         return f"ADD {self.visit(node.constraint)}"
