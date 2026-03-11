@@ -7,7 +7,11 @@ from buildaquery import (
     ExecutorCapabilities,
     DuckDbCompiler,
     DuckDbExecutor,
+    AppliedMigration,
     InMemoryMetricsAdapter,
+    MigrationApplySummary,
+    MigrationRunner,
+    MigrationStep,
     MySqlCompiler,
     ObservabilitySettings,
     PostgresExecutor,
@@ -37,6 +41,10 @@ def test_root_public_api_exports_are_importable() -> None:
     assert DuckDbExecutor is not None
     assert ClickHouseCompiler is not None
     assert ClickHouseExecutor is not None
+    assert MigrationStep is not None
+    assert AppliedMigration is not None
+    assert MigrationRunner is not None
+    assert MigrationApplySummary is not None
     assert SeedStep is not None
     assert SeedRunner is not None
     assert SeedRunSummary is not None

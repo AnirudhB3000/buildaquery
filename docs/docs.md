@@ -62,6 +62,7 @@ Optional resilience path:
 11. For manual SQL inputs, you may use dict-style named params with `:name` markers; executors rewrite them to the target dialect placeholders before execution.
 12. If your app needs dialect-aware branching, use `executor.capabilities()` instead of hardcoding backend names.
 13. If you need deterministic bootstrap data, use `SeedRunner` and `SeedStep` on top of your existing executor.
+14. If you need ordered schema evolution, use `MigrationRunner` and `MigrationStep` with an explicit version list.
 
 Normalized execution errors include:
 - dialect
@@ -229,6 +230,37 @@ steps = [
 
 summary = SeedRunner(transactional=True).run(executor, steps)
 print(summary.completed_steps)
+```
+
+## Migration-Lite Utility
+
+Use `MigrationRunner` and `MigrationStep` for small, ordered schema evolution flows.
+
+- Applies pending versions in ascending order.
+- Tracks applied versions in a dedicated migration table.
+- Wraps each migration in its own transaction by default when the executor supports transactions.
+- `rollback_last(...)` only works when the latest applied migration defines a `down` action.
+- Callable migration actions still obey executor security rules such as `raw_sql_policy` for `execute_raw(...)`.
+
+```python
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.migrations import MigrationRunner, MigrationStep
+
+runner = MigrationRunner()
+
+migrations = [
+    MigrationStep(
+        version=1,
+        name="create-users",
+        up=CompiledQuery(
+            sql="CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)"
+        ),
+        down=CompiledQuery(sql="DROP TABLE users"),
+    ),
+]
+
+summary = runner.apply(executor, migrations)
+print(summary.applied_versions)
 ```
 ## OLTP Features
 
@@ -658,6 +690,7 @@ poetry run package-check
 - Row shaping syntax example: `examples/sample_row_shaping.py`
 - Named params syntax example: `examples/sample_named_params.py`
 - Capability introspection example: `examples/sample_capabilities.py`
+- Migration syntax example: `examples/sample_migrations.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:
   - `buildaquery/abstract_syntax_tree/`

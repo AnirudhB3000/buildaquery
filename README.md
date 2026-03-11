@@ -29,6 +29,8 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Named-Parameter Convenience**: Executors accept dict-style params for manual `CompiledQuery(...)` and `execute_raw(...)` inputs, rewriting `:name` markers into each dialect's native placeholders.
 - **Capability Introspection**: `executor.capabilities()` exposes explicit dialect support flags so applications can branch safely on transactions, savepoints, returning, upsert, and lock-clause features.
 - **Deterministic Seeding**: `SeedRunner` and `SeedStep` provide a small first-party seeding utility for ordered bootstrap data flows.
+- **Migration Tracking**: `MigrationRunner` applies ordered schema changes, records applied versions, and supports explicit rollback of the latest applied migration when a `down` action is defined.
+- **Migration-Lite Utility**: `MigrationRunner` and ordered `MigrationStep` definitions provide first-party schema version tracking with optional rollback support.
 
 ## OLTP Capabilities
 
@@ -295,6 +297,39 @@ steps = [
 
 summary = SeedRunner(transactional=True).run(executor, steps)
 print(summary.completed_steps)
+```
+
+## Migration-Lite Utility
+
+Use `MigrationRunner` when you want a small, first-party way to apply ordered schema changes and track applied versions inside the database.
+
+- Pending migrations run in ascending version order.
+- Each migration is wrapped in its own transaction by default when the executor supports transactions.
+- `rollback_last(...)` only runs when the latest applied migration has an explicit `down` action.
+- Internal tracking-table writes use vetted SQL and callable migration actions still obey executor `execute_raw(...)` policy enforcement.
+
+```python
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.migrations import MigrationRunner, MigrationStep
+
+runner = MigrationRunner()
+
+migrations = [
+    MigrationStep(
+        version=1,
+        name="create-users",
+        up=CompiledQuery(
+            sql="CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)"
+        ),
+        down=CompiledQuery(sql="DROP TABLE users"),
+    ),
+]
+
+apply_summary = runner.apply(executor, migrations)
+print(apply_summary.applied_versions)
+
+rollback_summary = runner.rollback_last(executor, migrations)
+print(rollback_summary.rolled_back)
 ```
 ## Quick Start
 
@@ -694,6 +729,7 @@ For app-level observability wiring (no library source edits), see `examples/samp
 For upsert patterns, see `examples/sample_upsert.py`.
 For write-return payloads, see `examples/sample_returning.py`.
 For batch writes, see `examples/sample_batch_write.py`.
+For migrations, see `examples/sample_migrations.py`.
 For DDL constraints/indexes and `ALTER TABLE`, see `examples/sample_ddl_constraints.py`.
 
 ## Development Setup

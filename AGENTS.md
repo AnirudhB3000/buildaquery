@@ -234,6 +234,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Rewrites named markers into dialect-native placeholders (`%s`, `?`, or Oracle `:1`/`:2`/...) without interpolating values into SQL text.
     *   Added unit and SQLite integration coverage for quoted-literal/comment safety, missing-key errors, duplicate named markers, and hostile payload preservation.
     *   **Important downstream maintenance**: keep named-param rewriting scoped to manual SQL/executor inputs only, and extend the scanner/tests whenever a new placeholder dialect or SQL edge case is introduced.
+*   **Migration-Lite Utility**:
+    *   Added `buildaquery.migrations` with `MigrationStep`, `AppliedMigration`, `MigrationRunner`, `MigrationApplySummary`, and `MigrationRollbackSummary` for ordered schema evolution with tracked applied versions.
+    *   Added unit and SQLite integration coverage for migration ordering, duplicate/out-of-order rejection, rollback behavior, transaction rollback on failure, and raw-SQL policy enforcement inside callable migration actions.
+    *   Updated public exports, syntax-only examples, and user/developer docs.
+    *   **Important downstream maintenance**: keep migration tracking-table writes vetted and parameterized, preserve `execute_raw(..., trusted=...)` policy enforcement for callable migration actions, and update exports plus `test_public_api_exports.py` whenever the migration surface expands.
 *   **Minimal Seed Helper**:
     *   Added `buildaquery.seeding` with `SeedStep`, `SeedRunner`, `SeedRunSummary`, and `SeedRunError` for deterministic ordered data bootstrapping.
     *   Seed steps can run AST statements, `CompiledQuery(...)` inputs, or executor callbacks while reusing the existing executor compile/execute pipeline.

@@ -45,6 +45,14 @@ from buildaquery.execution import (
     execution_event_to_dict,
     make_json_event_logger,
 )
+from buildaquery.migrations import (
+    AppliedMigration,
+    MigrationApplySummary,
+    MigrationError,
+    MigrationRollbackSummary,
+    MigrationRunner,
+    MigrationStep,
+)
 from buildaquery.seeding import SeedRunError, SeedRunSummary, SeedRunner, SeedStep
 
 try:
@@ -95,6 +103,12 @@ __all__ = [
     "ConnectionTimeoutError",
     "IntegrityConstraintError",
     "ProgrammingExecutionError",
+    "MigrationStep",
+    "AppliedMigration",
+    "MigrationRunner",
+    "MigrationApplySummary",
+    "MigrationRollbackSummary",
+    "MigrationError",
     "SeedStep",
     "SeedRunner",
     "SeedRunSummary",

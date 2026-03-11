@@ -397,3 +397,28 @@ Different executors require specific database drivers:
 
 
 
+
+
+### Minimal Migrations
+
+For simple schema-version tracking, use `MigrationRunner` and ordered `MigrationStep(...)` definitions from `buildaquery.migrations`.
+
+```python
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.migrations import MigrationRunner, MigrationStep
+
+runner = MigrationRunner()
+migrations = [
+    MigrationStep(
+        version=1,
+        name="create-users",
+        up=CompiledQuery(
+            sql="CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL)"
+        ),
+        down=CompiledQuery(sql="DROP TABLE users"),
+    ),
+]
+
+summary = runner.apply(executor, migrations)
+print(summary.applied_versions)
+```
