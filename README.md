@@ -26,6 +26,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Observability Hooks**: Structured query observations plus lifecycle logging events (query/retry/transaction/connection) via `ObservabilitySettings`.
 - **Boundary Input Validation (Optional)**: Minimal Pydantic models/translators for validating external config and raw execution payloads before executor usage.
 - **SQL Preview Helpers**: `compiler.to_sql(...)`, `executor.to_sql(...)`, and `CompiledQuery.to_sql()` expose placeholder-based SQL plus separate params for safe debug/inspection.
+- **Named-Parameter Convenience**: Executors accept dict-style params for manual `CompiledQuery(...)` and `execute_raw(...)` inputs, rewriting `:name` markers into each dialect's native placeholders.
 
 ## OLTP Capabilities
 
@@ -208,6 +209,32 @@ executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
 preview = executor.to_sql(query)
 print(preview.to_sql())
 print(preview.params)
+```
+
+## Named Parameters For Manual SQL
+
+When you build `CompiledQuery(...)` yourself or call `execute_raw(...)`, you can pass dict-style params using `:name` markers. Executors rewrite those markers into the target dialect's placeholder format before execution:
+
+- PostgreSQL / MySQL / CockroachDB: `%s`
+- SQLite / MariaDB / SQL Server / DuckDB / ClickHouse: `?`
+- Oracle: `:1`, `:2`, ...
+
+Values remain parameterized. They are not interpolated into SQL text.
+
+```python
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.sqlite import SqliteExecutor
+
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+
+query = CompiledQuery(
+    sql="SELECT id, email FROM users WHERE email = :email AND tenant_id = :tenant_id",
+    params={"email": "alice@example.com", "tenant_id": 42},
+)
+
+preview = executor.to_sql(query)
+print(preview.to_sql())   # SELECT id, email FROM users WHERE email = ? AND tenant_id = ?
+print(preview.params)     # ['alice@example.com', 42]
 ```
 ## Quick Start
 
@@ -595,6 +622,7 @@ executor.execute(drop_stmt)
 For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_starter_templates.py`, `examples/sample_duckdb.py`, `examples/sample_clickhouse.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
 For copy-paste starter snippets across CRUD/upsert/transaction/retry/observability flows, see `examples/sample_starter_templates.py`.
 For boundary validation patterns with external payloads, see `examples/sample_validation.py`.
+For dict-style named params on manual `CompiledQuery` or `execute_raw(...)` inputs, see `examples/sample_named_params.py`.
 For transaction control, see `examples/sample_transactions.py`.
 For automatic commit/rollback patterns, prefer `with executor.transaction(): ...`.
 For opt-in dict/model row outputs, see `examples/sample_row_shaping.py`.

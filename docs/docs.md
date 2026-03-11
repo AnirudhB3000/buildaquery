@@ -59,6 +59,7 @@ Optional resilience path:
 8. For built-in telemetry in-process, use `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
 9. If input comes from external sources, validate it first with the optional `buildaquery.validation` models/translators.
 10. If your app must block ad-hoc raw SQL, set `raw_sql_policy="deny_untrusted"` or `raw_sql_policy="deny_all"` on executors.
+11. For manual SQL inputs, you may use dict-style named params with `:name` markers; executors rewrite them to the target dialect placeholders before execution.
 
 Normalized execution errors include:
 - dialect
@@ -145,6 +146,28 @@ preview = executor.to_sql(query)
 print(preview.to_sql())
 print(preview.params)
 ```
+
+## Named Params For Manual SQL
+
+If you create `CompiledQuery(...)` yourself or call `execute_raw(...)`, you can pass params as a dict and use `:name` markers in the SQL:
+
+```python
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.sqlite import SqliteExecutor
+
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+
+query = CompiledQuery(
+    sql="SELECT id, email FROM users WHERE email = :email AND tenant_id = :tenant_id",
+    params={"email": "alice@example.com", "tenant_id": 42},
+)
+
+preview = executor.to_sql(query)
+print(preview.to_sql())   # SELECT id, email FROM users WHERE email = ? AND tenant_id = ?
+print(preview.params)     # ['alice@example.com', 42]
+```
+
+This works for manual `CompiledQuery(...)` and `execute_raw(...)` usage. AST-built queries already compile to safe native placeholders automatically.
 ## OLTP Features
 
 For transactional workloads, Build-a-Query provides:
@@ -570,6 +593,7 @@ poetry run package-check
 - Observability wiring example: `examples/sample_observability_integration.py`
 - Boundary validation example: `examples/sample_validation.py`
 - Row shaping syntax example: `examples/sample_row_shaping.py`
+- Named params syntax example: `examples/sample_named_params.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:
   - `buildaquery/abstract_syntax_tree/`

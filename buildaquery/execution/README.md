@@ -65,6 +65,16 @@ When blocked, executors raise `ProgrammingExecutionError` and emit `security.exe
 
 Executors expose `to_sql(ast_or_compiled)` to preview the exact placeholder SQL and params they would execute. This helper does not execute anything and does not interpolate param values into SQL text.
 
+### Named-Parameter Convenience
+
+For manually constructed `CompiledQuery(...)` objects and `execute_raw(...)` calls, executors also accept dict-style params using `:name` markers. The shared execution layer rewrites them into the dialect's native placeholder style before execution:
+
+- PostgreSQL / MySQL / CockroachDB: `%s`
+- SQLite / MariaDB / SQL Server / DuckDB / ClickHouse: `?`
+- Oracle: `:1`, `:2`, ...
+
+The rewrite is placeholder-only. Values stay in the separate params list and are not interpolated into SQL text.
+
 ### Observability Hooks
 
 All executors support observability through `ObservabilitySettings`:
@@ -214,6 +224,15 @@ observed_executor = PostgresExecutor(
     ),
 )
 observed_executor.fetch_all(compiled)
+
+# 9. Named-parameter convenience for manual SQL
+named = CompiledQuery(
+    sql="SELECT * FROM users WHERE email = :email OR backup_email = :email",
+    params={"email": "alice@example.com"},
+)
+preview = executor.to_sql(named)
+print(preview.to_sql())   # SELECT * FROM users WHERE email = %s OR backup_email = %s
+print(preview.params)     # ['alice@example.com', 'alice@example.com']
 ```
 
 ### Oracle Example

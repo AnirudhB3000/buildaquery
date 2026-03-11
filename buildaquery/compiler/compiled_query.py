@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 # ==================================================
 # Compiled Output
@@ -11,7 +11,7 @@ class CompiledQuery:
     Represents the result of the compilation process.
     """
     sql: str
-    params: list[Any] = field(default_factory=list)
+    params: Sequence[Any] | Mapping[str, Any] = field(default_factory=list)
 
     def to_sql(self) -> str:
         """

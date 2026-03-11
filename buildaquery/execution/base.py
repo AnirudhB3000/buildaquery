@@ -84,12 +84,114 @@ class Executor(ABC):
         Returns the compiled placeholder SQL and params without executing it.
         """
         if isinstance(query, CompiledQuery):
-            return query
+            return self._normalize_compiled_query(query)
 
         compiler = getattr(self, "compiler", None)
         if compiler is None or not hasattr(compiler, "compile"):
             raise RuntimeError("Executor does not expose a compiler for to_sql().")
         return compiler.compile(query)
+
+    def _dialect_placeholder(self, index: int, name: str) -> str:
+        _ = name
+        dialect = self._dialect_name()
+        if dialect == "oracle":
+            return f":{index}"
+        if dialect in {"postgres", "mysql", "cockroachdb"}:
+            return "%s"
+        return "?"
+
+    def _rewrite_named_params(
+        self,
+        sql: str,
+        params: Mapping[str, Any],
+    ) -> tuple[str, list[Any]]:
+        rewritten: list[str] = []
+        ordered_params: list[Any] = []
+        length = len(sql)
+        index = 0
+        placeholder_index = 1
+
+        while index < length:
+            char = sql[index]
+
+            if char == "'" or char == '"':
+                quote = char
+                rewritten.append(char)
+                index += 1
+                while index < length:
+                    current = sql[index]
+                    rewritten.append(current)
+                    index += 1
+                    if current == quote:
+                        if quote == "'" and index < length and sql[index] == "'":
+                            rewritten.append(sql[index])
+                            index += 1
+                            continue
+                        break
+                continue
+
+            if char == "-" and index + 1 < length and sql[index + 1] == "-":
+                newline = sql.find("\n", index + 2)
+                if newline == -1:
+                    rewritten.append(sql[index:])
+                    break
+                rewritten.append(sql[index:newline])
+                index = newline
+                continue
+
+            if char == "/" and index + 1 < length and sql[index + 1] == "*":
+                comment_end = sql.find("*/", index + 2)
+                if comment_end == -1:
+                    rewritten.append(sql[index:])
+                    break
+                comment_end += 2
+                rewritten.append(sql[index:comment_end])
+                index = comment_end
+                continue
+
+            if char == ":":
+                next_char = sql[index + 1] if index + 1 < length else ""
+                if next_char == ":" or next_char == "=":
+                    rewritten.append(char)
+                    rewritten.append(next_char)
+                    index += 2
+                    continue
+                if next_char.isdigit():
+                    rewritten.append(char)
+                    index += 1
+                    continue
+                if next_char.isalpha() or next_char == "_":
+                    end = index + 2
+                    while end < length and (sql[end].isalnum() or sql[end] == "_"):
+                        end += 1
+                    name = sql[index + 1 : end]
+                    if name not in params:
+                        raise ValueError(f"Missing named SQL parameter: {name}")
+                    rewritten.append(self._dialect_placeholder(placeholder_index, name))
+                    ordered_params.append(params[name])
+                    placeholder_index += 1
+                    index = end
+                    continue
+
+            rewritten.append(char)
+            index += 1
+
+        return "".join(rewritten), ordered_params
+
+    def _normalize_sql_params(
+        self,
+        sql: str,
+        params: Sequence[Any] | Mapping[str, Any] | None,
+    ) -> tuple[str, Sequence[Any] | None]:
+        if params is None:
+            return sql, None
+        if isinstance(params, Mapping):
+            return self._rewrite_named_params(sql, params)
+        return sql, params
+
+    def _normalize_compiled_query(self, query: CompiledQuery) -> CompiledQuery:
+        sql, params = self._normalize_sql_params(query.sql, query.params)
+        return CompiledQuery(sql=sql, params=[] if params is None else params)
 
     def _validate_row_output(self, row_output: str, row_model: type[Any] | None) -> RowOutput:
         allowed: tuple[str, ...] = ("tuple", "dict", "model")

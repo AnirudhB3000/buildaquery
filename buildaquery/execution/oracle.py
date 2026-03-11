@@ -1,5 +1,5 @@
 import importlib
-from typing import Any, Sequence, cast
+from typing import Any, Mapping, Sequence, cast
 from urllib.parse import unquote, urlparse
 import time
 from uuid import uuid4
@@ -59,7 +59,7 @@ class OracleExecutor(Executor):
     def _compile_if_needed(self, query: CompiledQuery | ASTNode) -> CompiledQuery:
         if isinstance(query, ASTNode):
             return self.compiler.compile(query)
-        return query
+        return self._normalize_compiled_query(query)
 
     def _get_oracledb(self) -> Any:
         if self._oracledb is None:
@@ -241,8 +241,9 @@ class OracleExecutor(Executor):
         finally:
             self._release_connection(conn, release_mode)
 
-    def execute_raw(self, sql: str, params: Sequence[Any] | None = None, *, trusted: bool = False) -> None:
+    def execute_raw(self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None, *, trusted: bool = False) -> None:
         self._enforce_execute_raw_policy(sql=sql, trusted=trusted)
+        sql, params = self._normalize_sql_params(sql, params)
         self._observe_query(
             operation="execute_raw",
             sql=sql,
@@ -250,7 +251,7 @@ class OracleExecutor(Executor):
             run=lambda: self._execute_raw_observed(sql, params),
         )
 
-    def _execute_raw_observed(self, sql: str, params: Sequence[Any] | None = None) -> None:
+    def _execute_raw_observed(self, sql: str, params: Sequence[Any] | Mapping[str, Any] | None = None) -> None:
         conn, release_mode = self._get_connection_for_query()
         try:
             cursor = conn.cursor()

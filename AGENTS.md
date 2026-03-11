@@ -224,6 +224,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Applied row shaping across row-returning `execute(...)`, `fetch_all(...)`, and `fetch_one(...)` paths.
     *   Added unit and SQLite integration coverage plus a syntax-oriented example (`examples/sample_row_shaping.py`).
     *   **Important downstream maintenance**: keep tuple output as the default for compatibility, and ensure new executors route cursor metadata through the shared shaping helpers.
+*   **Named-Parameter Convenience For Manual SQL**:
+    *   Added shared executor-side rewriting for dict-style params on manual `CompiledQuery(...)` and `execute_raw(...)` inputs using `:name` markers.
+    *   Rewrites named markers into dialect-native placeholders (`%s`, `?`, or Oracle `:1`/`:2`/...) without interpolating values into SQL text.
+    *   Added unit and SQLite integration coverage for quoted-literal/comment safety, missing-key errors, duplicate named markers, and hostile payload preservation.
+    *   **Important downstream maintenance**: keep named-param rewriting scoped to manual SQL/executor inputs only, and extend the scanner/tests whenever a new placeholder dialect or SQL edge case is introduced.
 
 ---
 
