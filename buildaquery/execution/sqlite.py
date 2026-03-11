@@ -5,6 +5,7 @@ from uuid import uuid4
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.compiler.sqlite.sqlite_compiler import SqliteCompiler
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.base import Executor, RawSqlPolicy
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
 from buildaquery.execution.observability import ObservabilitySettings
@@ -18,6 +19,19 @@ class SqliteExecutor(Executor):
     """
     An executor for SQLite using the standard library 'sqlite3' module.
     """
+
+    CAPABILITIES = ExecutorCapabilities(
+        transactions=True,
+        savepoints=True,
+        upsert=True,
+        insert_returning=True,
+        update_returning=True,
+        delete_returning=True,
+        select_for_update=False,
+        select_for_share=False,
+        lock_nowait=False,
+        lock_skip_locked=False,
+    )
 
     def __init__(
         self,

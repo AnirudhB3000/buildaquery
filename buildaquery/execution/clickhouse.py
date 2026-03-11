@@ -5,6 +5,7 @@ import re
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.base import Executor, RawSqlPolicy
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
 from buildaquery.execution.observability import ObservabilitySettings
@@ -18,6 +19,19 @@ class ClickHouseExecutor(Executor):
     """
     An executor for ClickHouse using the `clickhouse-driver` DB-API module.
     """
+
+    CAPABILITIES = ExecutorCapabilities(
+        transactions=False,
+        savepoints=False,
+        upsert=False,
+        insert_returning=False,
+        update_returning=False,
+        delete_returning=False,
+        select_for_update=False,
+        select_for_share=False,
+        lock_nowait=False,
+        lock_skip_locked=False,
+    )
 
     def __init__(
         self,

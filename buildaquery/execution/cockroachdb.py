@@ -5,6 +5,7 @@ from uuid import uuid4
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.cockroachdb.cockroachdb_compiler import CockroachDbCompiler
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.base import Executor, RawSqlPolicy
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
 from buildaquery.execution.observability import ObservabilitySettings
@@ -18,6 +19,19 @@ class CockroachExecutor(Executor):
     """
     An executor for CockroachDB using the 'psycopg' library.
     """
+
+    CAPABILITIES = ExecutorCapabilities(
+        transactions=True,
+        savepoints=True,
+        upsert=True,
+        insert_returning=True,
+        update_returning=True,
+        delete_returning=True,
+        select_for_update=True,
+        select_for_share=True,
+        lock_nowait=True,
+        lock_skip_locked=True,
+    )
 
     def __init__(
         self,

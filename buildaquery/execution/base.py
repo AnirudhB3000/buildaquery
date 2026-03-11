@@ -5,6 +5,7 @@ from typing import Any, Literal, Mapping, Sequence
 from uuid import uuid4
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.errors import (
     ExecutionError,
     ExecutionErrorDetails,
@@ -51,6 +52,19 @@ class Executor(ABC):
     Abstract base class for executing compiled queries against a database.
     """
 
+    CAPABILITIES = ExecutorCapabilities(
+        transactions=True,
+        savepoints=True,
+        upsert=False,
+        insert_returning=False,
+        update_returning=False,
+        delete_returning=False,
+        select_for_update=False,
+        select_for_share=False,
+        lock_nowait=False,
+        lock_skip_locked=False,
+    )
+
     @abstractmethod
     def execute(self, compiled_query: CompiledQuery) -> Any:
         """
@@ -90,6 +104,12 @@ class Executor(ABC):
         if compiler is None or not hasattr(compiler, "compile"):
             raise RuntimeError("Executor does not expose a compiler for to_sql().")
         return compiler.compile(query)
+
+    def capabilities(self) -> ExecutorCapabilities:
+        """
+        Returns the executor's explicit dialect capability contract.
+        """
+        return self.CAPABILITIES
 
     def _dialect_placeholder(self, index: int, name: str) -> str:
         _ = name

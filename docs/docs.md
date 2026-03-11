@@ -60,6 +60,7 @@ Optional resilience path:
 9. If input comes from external sources, validate it first with the optional `buildaquery.validation` models/translators.
 10. If your app must block ad-hoc raw SQL, set `raw_sql_policy="deny_untrusted"` or `raw_sql_policy="deny_all"` on executors.
 11. For manual SQL inputs, you may use dict-style named params with `:name` markers; executors rewrite them to the target dialect placeholders before execution.
+12. If your app needs dialect-aware branching, use `executor.capabilities()` instead of hardcoding backend names.
 
 Normalized execution errors include:
 - dialect
@@ -168,6 +169,31 @@ print(preview.params)     # ['alice@example.com', 42]
 ```
 
 This works for manual `CompiledQuery(...)` and `execute_raw(...)` usage. AST-built queries already compile to safe native placeholders automatically.
+
+## Capability Introspection
+
+Use `executor.capabilities()` to branch safely on dialect support such as:
+- transactions
+- savepoints
+- upsert
+- insert/update/delete returning
+- `FOR UPDATE` / `FOR SHARE`
+- `NOWAIT` / `SKIP LOCKED`
+
+The capability contract is explicit and conservative. It is intended to answer "can I rely on this surface here?" rather than to probe a driver at runtime.
+
+```python
+from buildaquery.execution.postgres import PostgresExecutor
+
+executor = PostgresExecutor(connection=object())
+caps = executor.capabilities()
+
+if caps.select_for_update and caps.lock_skip_locked:
+    print("safe to use FOR UPDATE SKIP LOCKED")
+
+if caps.insert_returning:
+    print("safe to rely on INSERT ... RETURNING / OUTPUT")
+```
 ## OLTP Features
 
 For transactional workloads, Build-a-Query provides:
@@ -181,6 +207,7 @@ For transactional workloads, Build-a-Query provides:
   - `row_output="dict"` returns dict rows keyed by column name.
   - `row_output="model"` returns instances of `row_model`.
 - Concurrency lock clauses on `SELECT` (dialect-aware), including `NOWAIT` and `SKIP LOCKED` on supported backends.
+- Capability introspection via `executor.capabilities()` so applications can branch safely on lock/upsert/returning/transaction support.
 - Dialect-aware upsert support with conflict handling.
 - Write-return payloads through `returning_clause` (`RETURNING`/`OUTPUT` equivalents by dialect).
 - Batch write support via `InsertStatementNode.rows` and `execute_many(...)`.
@@ -594,6 +621,7 @@ poetry run package-check
 - Boundary validation example: `examples/sample_validation.py`
 - Row shaping syntax example: `examples/sample_row_shaping.py`
 - Named params syntax example: `examples/sample_named_params.py`
+- Capability introspection example: `examples/sample_capabilities.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:
   - `buildaquery/abstract_syntax_tree/`

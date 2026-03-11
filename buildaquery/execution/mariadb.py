@@ -7,6 +7,7 @@ from uuid import uuid4
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.compiler.mariadb.mariadb_compiler import MariaDbCompiler
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.base import Executor, RawSqlPolicy
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
 from buildaquery.execution.observability import ObservabilitySettings
@@ -20,6 +21,19 @@ class MariaDbExecutor(Executor):
     """
     An executor for MariaDB using the 'mariadb' library.
     """
+
+    CAPABILITIES = ExecutorCapabilities(
+        transactions=True,
+        savepoints=True,
+        upsert=True,
+        insert_returning=True,
+        update_returning=False,
+        delete_returning=True,
+        select_for_update=True,
+        select_for_share=True,
+        lock_nowait=True,
+        lock_skip_locked=True,
+    )
 
     def __init__(
         self,

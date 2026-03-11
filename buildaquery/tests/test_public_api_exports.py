@@ -4,6 +4,7 @@ from buildaquery import (
     ClickHouseExecutor,
     CompiledQuery,
     ConnectionSettings,
+    ExecutorCapabilities,
     DuckDbCompiler,
     DuckDbExecutor,
     InMemoryMetricsAdapter,
@@ -14,6 +15,7 @@ from buildaquery import (
     SqliteCompiler,
 )
 from buildaquery.compiler import CompiledQuery as CompiledQueryFromCompiler
+from buildaquery.execution import ExecutorCapabilities as ExecutorCapabilitiesFromExecution
 from buildaquery.execution import MetricPoint
 
 
@@ -24,6 +26,7 @@ def test_root_public_api_exports_are_importable() -> None:
     assert MySqlCompiler is not None
     assert RetryPolicy is not None
     assert ConnectionSettings is not None
+    assert ExecutorCapabilities is not None
     assert ObservabilitySettings is not None
     assert InMemoryMetricsAdapter is not None
     assert CompiledQuery is not None
@@ -40,3 +43,19 @@ def test_compiler_exports_include_compiled_query() -> None:
 def test_execution_exports_include_metric_point() -> None:
     metric = MetricPoint(name="count", labels={"dialect": "sqlite"}, value=1)
     assert metric.name == "count"
+
+
+def test_execution_exports_include_executor_capabilities() -> None:
+    capabilities = ExecutorCapabilitiesFromExecution(
+        transactions=True,
+        savepoints=True,
+        upsert=False,
+        insert_returning=False,
+        update_returning=False,
+        delete_returning=False,
+        select_for_update=False,
+        select_for_share=False,
+        lock_nowait=False,
+        lock_skip_locked=False,
+    )
+    assert capabilities.transactions is True

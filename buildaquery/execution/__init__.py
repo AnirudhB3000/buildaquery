@@ -7,6 +7,7 @@ from buildaquery.execution.mariadb import MariaDbExecutor
 from buildaquery.execution.cockroachdb import CockroachExecutor
 from buildaquery.execution.duckdb import DuckDbExecutor
 from buildaquery.execution.clickhouse import ClickHouseExecutor
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.retry import RetryPolicy
 from buildaquery.execution.connection import ConnectionSettings
 from buildaquery.execution.observability import (
@@ -43,6 +44,7 @@ __all__ = [
     "CockroachExecutor",
     "DuckDbExecutor",
     "ClickHouseExecutor",
+    "ExecutorCapabilities",
     "RetryPolicy",
     "ConnectionSettings",
     "ObservabilitySettings",

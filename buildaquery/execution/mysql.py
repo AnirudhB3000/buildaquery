@@ -6,6 +6,7 @@ from uuid import uuid4
 from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.compiler.mysql.mysql_compiler import MySqlCompiler
+from buildaquery.execution.capabilities import ExecutorCapabilities
 from buildaquery.execution.base import Executor, RawSqlPolicy
 from buildaquery.execution.connection import ConnectionAcquireHook, ConnectionReleaseHook, ConnectionSettings
 from buildaquery.execution.observability import ObservabilitySettings
@@ -19,6 +20,19 @@ class MySqlExecutor(Executor):
     """
     An executor for MySQL using the 'mysql-connector-python' library.
     """
+
+    CAPABILITIES = ExecutorCapabilities(
+        transactions=True,
+        savepoints=True,
+        upsert=True,
+        insert_returning=False,
+        update_returning=False,
+        delete_returning=False,
+        select_for_update=True,
+        select_for_share=True,
+        lock_nowait=True,
+        lock_skip_locked=True,
+    )
 
     def __init__(
         self,

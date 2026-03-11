@@ -65,6 +65,26 @@ When blocked, executors raise `ProgrammingExecutionError` and emit `security.exe
 
 Executors expose `to_sql(ast_or_compiled)` to preview the exact placeholder SQL and params they would execute. This helper does not execute anything and does not interpolate param values into SQL text.
 
+### Capability Introspection
+
+Executors expose `capabilities()` so application code can branch on explicit dialect support without hardcoding backend names.
+
+Current capability fields:
+- `transactions`
+- `savepoints`
+- `upsert`
+- `insert_returning`
+- `update_returning`
+- `delete_returning`
+- `select_for_update`
+- `select_for_share`
+- `lock_nowait`
+- `lock_skip_locked`
+- `execute_many`
+- `execute_raw`
+
+This contract is explicit and conservative. Use it for safe branching rather than optimistic runtime probing.
+
 ### Named-Parameter Convenience
 
 For manually constructed `CompiledQuery(...)` objects and `execute_raw(...)` calls, executors also accept dict-style params using `:name` markers. The shared execution layer rewrites them into the dialect's native placeholder style before execution:
@@ -233,6 +253,11 @@ named = CompiledQuery(
 preview = executor.to_sql(named)
 print(preview.to_sql())   # SELECT * FROM users WHERE email = %s OR backup_email = %s
 print(preview.params)     # ['alice@example.com', 'alice@example.com']
+
+# 10. Branch safely on explicit dialect capabilities
+caps = executor.capabilities()
+if caps.select_for_update and caps.lock_skip_locked:
+    print("Safe to compile FOR UPDATE SKIP LOCKED for this executor.")
 ```
 
 ### Oracle Example

@@ -219,6 +219,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added unit and SQLite integration coverage for commit-on-success, rollback-on-error, and isolation-level forwarding behavior.
     *   Updated transaction examples and docs to show `with executor.transaction(): ...` as the preferred ergonomic path.
     *   **Important downstream maintenance**: when transaction lifecycle behavior changes, keep the explicit APIs and the context helper semantics aligned across executors and tests.
+*   **Dialect Capability Introspection**:
+    *   Added `ExecutorCapabilities` and `executor.capabilities()` so applications can branch safely on transactions, savepoints, upsert support, write-return payload support, and lock-clause support without hardcoding dialect names.
+    *   Added unit coverage to lock down capability declarations across key dialects and exported the new capability model through the public package surface.
+    *   Updated user/developer docs and a syntax-only example for capability-driven branching.
+    *   **Important downstream maintenance**: when a dialect gains or loses support for transactional, returning, upsert, or lock-clause features, update the executor capability declaration, public exports, and `test_execution_capabilities.py` together.
 *   **Opt-In Row Shaping**:
     *   Added executor-level row shaping with `row_output="tuple" | "dict" | "model"` and optional `row_model=...`.
     *   Applied row shaping across row-returning `execute(...)`, `fetch_all(...)`, and `fetch_one(...)` paths.

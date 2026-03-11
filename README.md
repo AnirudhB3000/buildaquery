@@ -27,6 +27,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Boundary Input Validation (Optional)**: Minimal Pydantic models/translators for validating external config and raw execution payloads before executor usage.
 - **SQL Preview Helpers**: `compiler.to_sql(...)`, `executor.to_sql(...)`, and `CompiledQuery.to_sql()` expose placeholder-based SQL plus separate params for safe debug/inspection.
 - **Named-Parameter Convenience**: Executors accept dict-style params for manual `CompiledQuery(...)` and `execute_raw(...)` inputs, rewriting `:name` markers into each dialect's native placeholders.
+- **Capability Introspection**: `executor.capabilities()` exposes explicit dialect support flags so applications can branch safely on transactions, savepoints, returning, upsert, and lock-clause features.
 
 ## OLTP Capabilities
 
@@ -46,6 +47,7 @@ The project includes first-class OLTP-oriented support across AST, compiler, exe
   - Built-in JSON logger helper: `make_json_event_logger(logger=...)` for one-line structured event logs.
   - Built-in adapters: `InMemoryMetricsAdapter`, `InMemoryTracingAdapter`, and `compose_event_observers(...)`.
 - **Raw SQL guardrails**: set `raw_sql_policy="deny_untrusted"` (or `"deny_all"`) to restrict `execute_raw(...)`; allow vetted calls with `trusted=True`.
+- **Capability introspection**: call `executor.capabilities()` to branch safely on lock/upsert/returning/transaction support without hardcoding dialect names.
 - **OLTP integration coverage**: contention/retry correctness, deadlock normalization, lost-update prevention, isolation visibility semantics, and lock behavior validation.
 
 ## Dialect Notes
@@ -235,6 +237,27 @@ query = CompiledQuery(
 preview = executor.to_sql(query)
 print(preview.to_sql())   # SELECT id, email FROM users WHERE email = ? AND tenant_id = ?
 print(preview.params)     # ['alice@example.com', 42]
+```
+
+## Capability Introspection
+
+Use `executor.capabilities()` when application behavior depends on dialect support for transactions, savepoints, lock clauses, upsert, or write-return payloads.
+
+The contract is explicit and conservative. It is intended for safe branching, not optimistic probing.
+
+```python
+from buildaquery.execution.postgres import PostgresExecutor
+
+executor = PostgresExecutor(connection=object())
+capabilities = executor.capabilities()
+
+if capabilities.select_for_update and capabilities.lock_skip_locked:
+    print("Can use FOR UPDATE SKIP LOCKED")
+
+if capabilities.insert_returning:
+    print("Can fetch rows directly from INSERT")
+
+print(capabilities.to_dict())
 ```
 ## Quick Start
 
@@ -623,6 +646,7 @@ For more examples, see the `examples/` directory (including `examples/sample_syn
 For copy-paste starter snippets across CRUD/upsert/transaction/retry/observability flows, see `examples/sample_starter_templates.py`.
 For boundary validation patterns with external payloads, see `examples/sample_validation.py`.
 For dict-style named params on manual `CompiledQuery` or `execute_raw(...)` inputs, see `examples/sample_named_params.py`.
+For runtime branching on dialect support, see `examples/sample_capabilities.py`.
 For transaction control, see `examples/sample_transactions.py`.
 For automatic commit/rollback patterns, prefer `with executor.transaction(): ...`.
 For opt-in dict/model row outputs, see `examples/sample_row_shaping.py`.
