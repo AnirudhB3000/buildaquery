@@ -2,6 +2,26 @@
 
 A Python-based query builder designed to represent, compile, and execute SQL queries using a dialect-agnostic Abstract Syntax Tree (AST). Supports PostgreSQL, SQLite, DuckDB, ClickHouse, MySQL, MariaDB, CockroachDB, Oracle, and SQL Server.
 
+## Supported Databases
+
+Build-a-Query currently supports the following databases:
+
+- PostgreSQL
+- SQLite
+- DuckDB
+- ClickHouse
+- MySQL
+- MariaDB
+- CockroachDB
+- Oracle
+- SQL Server
+
+Backend shape:
+
+- Embedded / local-first: SQLite, DuckDB
+- Server-based OLTP: PostgreSQL, MySQL, MariaDB, CockroachDB, Oracle, SQL Server
+- Server-based OLAP: ClickHouse
+
 ## Features
 
 - **Dialect-Agnostic AST**: Build queries using high-level Python objects.
