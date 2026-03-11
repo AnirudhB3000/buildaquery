@@ -219,6 +219,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added unit and SQLite integration coverage for commit-on-success, rollback-on-error, and isolation-level forwarding behavior.
     *   Updated transaction examples and docs to show `with executor.transaction(): ...` as the preferred ergonomic path.
     *   **Important downstream maintenance**: when transaction lifecycle behavior changes, keep the explicit APIs and the context helper semantics aligned across executors and tests.
+*   **Opt-In Row Shaping**:
+    *   Added executor-level row shaping with `row_output="tuple" | "dict" | "model"` and optional `row_model=...`.
+    *   Applied row shaping across row-returning `execute(...)`, `fetch_all(...)`, and `fetch_one(...)` paths.
+    *   Added unit and SQLite integration coverage plus a syntax-oriented example (`examples/sample_row_shaping.py`).
+    *   **Important downstream maintenance**: keep tuple output as the default for compatibility, and ensure new executors route cursor metadata through the shared shaping helpers.
 
 ---
 

@@ -1,7 +1,13 @@
 import pytest
 from unittest.mock import MagicMock, patch
+from dataclasses import dataclass
 from buildaquery.execution.postgres import PostgresExecutor
 from buildaquery.compiler.compiled_query import CompiledQuery
+
+
+@dataclass
+class _PgRow:
+    id: int
 
 @pytest.fixture
 def mock_psycopg():
@@ -25,6 +31,34 @@ def test_postgres_executor_fetch_all(mock_psycopg):
     mock_cur.execute.assert_called_once_with("SELECT %s", [1])
     mock_cur.fetchall.assert_called_once()
     mock_conn.close.assert_called_once()
+
+
+def test_postgres_executor_fetch_all_dict_rows(mock_psycopg):
+    executor = PostgresExecutor(connection_info="dsn", row_output="dict")
+    query = CompiledQuery(sql="SELECT %s AS id", params=[1])
+
+    mock_conn = mock_psycopg.connect.return_value
+    mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+    mock_cur.description = [("id", None, None, None, None, None, None)]
+    mock_cur.fetchall.return_value = [(1,)]
+
+    results = executor.fetch_all(query)
+
+    assert results == [{"id": 1}]
+
+
+def test_postgres_executor_fetch_one_model_row(mock_psycopg):
+    executor = PostgresExecutor(connection_info="dsn", row_output="model", row_model=_PgRow)
+    query = CompiledQuery(sql="SELECT %s AS id", params=[1])
+
+    mock_conn = mock_psycopg.connect.return_value
+    mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+    mock_cur.description = [("id", None, None, None, None, None, None)]
+    mock_cur.fetchone.return_value = (1,)
+
+    result = executor.fetch_one(query)
+
+    assert result == _PgRow(id=1)
 
 def test_postgres_executor_execute(mock_psycopg):
     executor = PostgresExecutor(connection_info="dsn")

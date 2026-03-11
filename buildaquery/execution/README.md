@@ -39,6 +39,15 @@ All executors support production-oriented connection controls:
 
 If `acquire_connection` is provided, executor operations use pooled connections and return them with `release_connection` (or `close()` when no release hook is provided).
 
+### Row Shaping
+
+Executors support opt-in row shaping through constructor configuration:
+- `row_output="tuple"`: default tuple rows.
+- `row_output="dict"`: dict rows keyed by column name.
+- `row_output="model"` with `row_model=YourType`: typed instances created from column names.
+
+This applies consistently to `execute(...)` when rows are returned, plus `fetch_all(...)` and `fetch_one(...)`.
+
 ### External Input Validation Boundary
 
 For untrusted external payloads (API/CLI/job/env), validate before executor construction/calls using the optional `buildaquery.validation` package (Pydantic-backed). This keeps executor internals lightweight while enforcing boundary checks.

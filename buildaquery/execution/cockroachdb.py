@@ -24,6 +24,8 @@ class CockroachExecutor(Executor):
         connection_info: str | dict[str, Any] | None = None,
         connection: Any | None = None,
         compiler: Any | None = None,
+        row_output: str = "tuple",
+        row_model: type[Any] | None = None,
         connect_timeout_seconds: float | None = None,
         acquire_connection: ConnectionAcquireHook | None = None,
         release_connection: ConnectionReleaseHook | None = None,
@@ -36,6 +38,8 @@ class CockroachExecutor(Executor):
         self.connection_info = connection_info
         self.connection = connection
         self.compiler = compiler or CockroachDbCompiler()
+        self.row_output = self._validate_row_output(row_output, row_model)
+        self.row_model = row_model
         self.connection_settings = ConnectionSettings(
             connect_timeout_seconds=connect_timeout_seconds,
             acquire_connection=acquire_connection,
@@ -137,7 +141,7 @@ class CockroachExecutor(Executor):
             with conn.cursor() as cur:
                 cur.execute(compiled_query.sql, compiled_query.params)
                 if cur.description:
-                    return cur.fetchall()
+                    return self._shape_rows(cur.fetchall(), cur.description)
         finally:
             if release_mode is not None:
                 if getattr(conn, "autocommit", False) is False:
@@ -158,7 +162,7 @@ class CockroachExecutor(Executor):
         try:
             with conn.cursor() as cur:
                 cur.execute(compiled_query.sql, compiled_query.params)
-                return cast(Sequence[Sequence[Any]], cur.fetchall())
+                return cast(Sequence[Sequence[Any]], self._shape_rows(cur.fetchall(), cur.description))
         finally:
             self._release_connection(conn, release_mode)
 
@@ -176,7 +180,7 @@ class CockroachExecutor(Executor):
         try:
             with conn.cursor() as cur:
                 cur.execute(compiled_query.sql, compiled_query.params)
-                return cast(Sequence[Any] | None, cur.fetchone())
+                return cast(Sequence[Any] | None, self._shape_single_row(cur.fetchone(), cur.description))
         finally:
             self._release_connection(conn, release_mode)
 

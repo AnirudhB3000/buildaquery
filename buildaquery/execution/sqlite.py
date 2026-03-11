@@ -24,6 +24,8 @@ class SqliteExecutor(Executor):
         connection_info: str | None = None,
         connection: Any | None = None,
         compiler: Any | None = None,
+        row_output: str = "tuple",
+        row_model: type[Any] | None = None,
         connect_timeout_seconds: float | None = None,
         acquire_connection: ConnectionAcquireHook | None = None,
         release_connection: ConnectionReleaseHook | None = None,
@@ -36,6 +38,8 @@ class SqliteExecutor(Executor):
         self.connection_info = connection_info
         self.connection = connection
         self.compiler = compiler or SqliteCompiler()
+        self.row_output = self._validate_row_output(row_output, row_model)
+        self.row_model = row_model
         self.connection_settings = ConnectionSettings(
             connect_timeout_seconds=connect_timeout_seconds,
             acquire_connection=acquire_connection,
@@ -76,7 +80,7 @@ class SqliteExecutor(Executor):
     def _execute_with_connection(self, connection: Any, compiled_query: CompiledQuery) -> Any:
         cur = connection.execute(compiled_query.sql, compiled_query.params)
         if cur.description:
-            return cur.fetchall()
+            return self._shape_rows(cur.fetchall(), cur.description)
         return None
 
     def _has_active_transaction(self) -> bool:
@@ -158,7 +162,7 @@ class SqliteExecutor(Executor):
         conn, release_mode = self._get_connection_for_query()
         try:
             cur = conn.execute(compiled_query.sql, compiled_query.params)
-            return cast(Sequence[Sequence[Any]], cur.fetchall())
+            return cast(Sequence[Sequence[Any]], self._shape_rows(cur.fetchall(), cur.description))
         finally:
             self._release_connection(conn, release_mode)
 
@@ -175,7 +179,7 @@ class SqliteExecutor(Executor):
         conn, release_mode = self._get_connection_for_query()
         try:
             cur = conn.execute(compiled_query.sql, compiled_query.params)
-            return cast(Sequence[Any] | None, cur.fetchone())
+            return cast(Sequence[Any] | None, self._shape_single_row(cur.fetchone(), cur.description))
         finally:
             self._release_connection(conn, release_mode)
 

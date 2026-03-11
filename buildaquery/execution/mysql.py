@@ -25,6 +25,8 @@ class MySqlExecutor(Executor):
         connection_info: str | dict[str, Any] | None = None,
         connection: Any | None = None,
         compiler: Any | None = None,
+        row_output: str = "tuple",
+        row_model: type[Any] | None = None,
         connect_timeout_seconds: float | None = None,
         acquire_connection: ConnectionAcquireHook | None = None,
         release_connection: ConnectionReleaseHook | None = None,
@@ -37,6 +39,8 @@ class MySqlExecutor(Executor):
         self.connection_info = connection_info
         self.connection = connection
         self.compiler = compiler or MySqlCompiler()
+        self.row_output = self._validate_row_output(row_output, row_model)
+        self.row_model = row_model
         self.connection_settings = ConnectionSettings(
             connect_timeout_seconds=connect_timeout_seconds,
             acquire_connection=acquire_connection,
@@ -105,7 +109,7 @@ class MySqlExecutor(Executor):
         try:
             cursor.execute(compiled_query.sql, compiled_query.params)
             if cursor.description:
-                return cursor.fetchall()
+                return self._shape_rows(cursor.fetchall(), cursor.description)
             return None
         finally:
             cursor.close()
@@ -183,7 +187,7 @@ class MySqlExecutor(Executor):
             cursor = conn.cursor()
             try:
                 cursor.execute(compiled_query.sql, compiled_query.params)
-                return cast(Sequence[Sequence[Any]], cursor.fetchall())
+                return cast(Sequence[Sequence[Any]], self._shape_rows(cursor.fetchall(), cursor.description))
             finally:
                 cursor.close()
         finally:
@@ -204,7 +208,7 @@ class MySqlExecutor(Executor):
             cursor = conn.cursor()
             try:
                 cursor.execute(compiled_query.sql, compiled_query.params)
-                return cast(Sequence[Any] | None, cursor.fetchone())
+                return cast(Sequence[Any] | None, self._shape_single_row(cursor.fetchone(), cursor.description))
             finally:
                 cursor.close()
         finally:

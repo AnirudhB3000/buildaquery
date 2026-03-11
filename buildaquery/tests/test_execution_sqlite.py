@@ -1,5 +1,6 @@
 import pytest
 import sqlite3
+from dataclasses import dataclass
 
 from buildaquery.abstract_syntax_tree.models import (
     BinaryOperationNode,
@@ -11,6 +12,12 @@ from buildaquery.abstract_syntax_tree.models import (
 )
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.execution.sqlite import SqliteExecutor
+
+
+@dataclass
+class _UserRow:
+    id: int
+    value: str
 
 
 def test_sqlite_executor_execute_and_fetch():
@@ -114,3 +121,32 @@ def test_sqlite_executor_to_sql_compiles_without_execution():
     assert compiled.sql == "SELECT id FROM users WHERE (email = ?)"
     assert compiled.params == ["alice@example.com"]
     conn.close()
+
+
+def test_sqlite_executor_fetch_all_dict_rows() -> None:
+    conn = sqlite3.connect(":memory:")
+    executor = SqliteExecutor(connection=conn, row_output="dict")
+    executor.execute_raw("CREATE TABLE t_dict (id INTEGER PRIMARY KEY, value TEXT)")
+    executor.execute(CompiledQuery(sql="INSERT INTO t_dict (id, value) VALUES (?, ?)", params=[1, "a"]))
+
+    rows = executor.fetch_all(CompiledQuery(sql="SELECT id, value FROM t_dict", params=[]))
+
+    assert rows == [{"id": 1, "value": "a"}]
+    conn.close()
+
+
+def test_sqlite_executor_fetch_one_model_row() -> None:
+    conn = sqlite3.connect(":memory:")
+    executor = SqliteExecutor(connection=conn, row_output="model", row_model=_UserRow)
+    executor.execute_raw("CREATE TABLE t_model (id INTEGER PRIMARY KEY, value TEXT)")
+    executor.execute(CompiledQuery(sql="INSERT INTO t_model (id, value) VALUES (?, ?)", params=[1, "a"]))
+
+    row = executor.fetch_one(CompiledQuery(sql="SELECT id, value FROM t_model", params=[]))
+
+    assert row == _UserRow(id=1, value="a")
+    conn.close()
+
+
+def test_sqlite_executor_row_output_model_requires_row_model() -> None:
+    with pytest.raises(ValueError, match="row_model is required"):
+        SqliteExecutor(connection=sqlite3.connect(":memory:"), row_output="model")

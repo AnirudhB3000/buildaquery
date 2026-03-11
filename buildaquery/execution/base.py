@@ -16,6 +16,7 @@ from buildaquery.execution.observability import ExecutionEvent, ObservabilitySet
 from buildaquery.execution.retry import RetryPolicy, run_with_retry
 
 RawSqlPolicy = Literal["allow", "deny_untrusted", "deny_all"]
+RowOutput = Literal["tuple", "dict", "model"]
 
 
 class _TransactionContext:
@@ -89,6 +90,53 @@ class Executor(ABC):
         if compiler is None or not hasattr(compiler, "compile"):
             raise RuntimeError("Executor does not expose a compiler for to_sql().")
         return compiler.compile(query)
+
+    def _validate_row_output(self, row_output: str, row_model: type[Any] | None) -> RowOutput:
+        allowed: tuple[str, ...] = ("tuple", "dict", "model")
+        if row_output not in allowed:
+            raise ValueError(f"Invalid row_output {row_output!r}. Expected one of: {', '.join(allowed)}")
+        if row_output == "model" and row_model is None:
+            raise ValueError("row_model is required when row_output='model'.")
+        return row_output
+
+    def _column_names_from_description(self, description: Any) -> list[str]:
+        if not description:
+            return []
+        names: list[str] = []
+        for column in description:
+            if isinstance(column, (list, tuple)) and column:
+                names.append(str(column[0]))
+            else:
+                names.append(str(getattr(column, "name", column)))
+        return names
+
+    def _shape_row(self, row: Sequence[Any], column_names: Sequence[str]) -> Any:
+        row_output = getattr(self, "row_output", "tuple")
+        if row_output == "tuple":
+            return tuple(row)
+
+        payload = dict(zip(column_names, row))
+        if row_output == "dict":
+            return payload
+
+        row_model = getattr(self, "row_model", None)
+        if row_model is None:
+            raise RuntimeError("row_model must be configured when row_output='model'.")
+        return row_model(**payload)
+
+    def _shape_rows(self, rows: Sequence[Sequence[Any]], description: Any) -> list[Any]:
+        column_names = self._column_names_from_description(description)
+        if not column_names or getattr(self, "row_output", "tuple") == "tuple":
+            return [tuple(row) for row in rows]
+        return [self._shape_row(row, column_names) for row in rows]
+
+    def _shape_single_row(self, row: Sequence[Any] | None, description: Any) -> Any:
+        if row is None:
+            return None
+        column_names = self._column_names_from_description(description)
+        if not column_names or getattr(self, "row_output", "tuple") == "tuple":
+            return tuple(row)
+        return self._shape_row(row, column_names)
 
     def transaction(self, isolation_level: str | None = None) -> _TransactionContext:
         """

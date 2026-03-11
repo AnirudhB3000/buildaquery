@@ -153,6 +153,10 @@ For transactional workloads, Build-a-Query provides:
 - Transaction context helper: `with executor.transaction(): ...` commits on success and rolls back on failure.
   - DuckDB note: savepoint APIs are runtime-version dependent; unsupported runtimes raise a clear executor `RuntimeError`.
   - ClickHouse note: explicit transaction/savepoint APIs are not supported by `ClickHouseExecutor`.
+- Row shaping options:
+  - `row_output="tuple"` keeps the default tuple rows.
+  - `row_output="dict"` returns dict rows keyed by column name.
+  - `row_output="model"` returns instances of `row_model`.
 - Concurrency lock clauses on `SELECT` (dialect-aware), including `NOWAIT` and `SKIP LOCKED` on supported backends.
 - Dialect-aware upsert support with conflict handling.
 - Write-return payloads through `returning_clause` (`RETURNING`/`OUTPUT` equivalents by dialect).
@@ -565,6 +569,7 @@ poetry run package-check
 - ClickHouse syntax example: `examples/sample_clickhouse.py`
 - Observability wiring example: `examples/sample_observability_integration.py`
 - Boundary validation example: `examples/sample_validation.py`
+- Row shaping syntax example: `examples/sample_row_shaping.py`
 - Integration test setup details: `tests/README.md`
 - Developer internals (AST nodes, traversal, compilers, executors): nested `README.md` files in:
   - `buildaquery/abstract_syntax_tree/`

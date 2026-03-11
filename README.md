@@ -19,6 +19,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `duckdb` (DuckDB), `clickhouse-driver` (ClickHouse), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 - **Transaction APIs**: First-class transaction control with `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, and `release_savepoint()` across executors.
 - **Transaction Context Helper**: `with executor.transaction(): ...` automatically commits on success and rolls back on error.
+- **Row Shaping**: Executors can return rows as tuples, dicts, or typed model instances via `row_output`.
 - **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
 - **Actionable Error Context**: Normalized execution errors include dialect, operation, SQLSTATE when available, and redacted placeholder SQL context.
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
@@ -596,6 +597,7 @@ For copy-paste starter snippets across CRUD/upsert/transaction/retry/observabili
 For boundary validation patterns with external payloads, see `examples/sample_validation.py`.
 For transaction control, see `examples/sample_transactions.py`.
 For automatic commit/rollback patterns, prefer `with executor.transaction(): ...`.
+For opt-in dict/model row outputs, see `examples/sample_row_shaping.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
 For connection management patterns, see `examples/sample_connection_management.py`.
 For observability hooks, see `examples/sample_observability.py`.
