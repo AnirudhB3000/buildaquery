@@ -557,6 +557,7 @@ poetry run package-check
 - Project overview: `README.md`
 - End-to-end examples: `examples/`
 - Syntax-only canonical quickstart example (no DB interaction): `examples/sample_syntax_quickstart.py`
+- Copy-paste starter templates (CRUD/upsert/transaction/retry/observability): `examples/sample_starter_templates.py`
 - DuckDB example: `examples/sample_duckdb.py`
 - ClickHouse syntax example: `examples/sample_clickhouse.py`
 - Observability wiring example: `examples/sample_observability_integration.py`

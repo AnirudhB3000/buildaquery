@@ -67,6 +67,8 @@ Built-in event adapters:
 - `InMemoryTracingAdapter()`: builds in-memory query/transaction spans.
 - `compose_event_observers(...)`: fans out each event to multiple adapters.
 
+Starter snippets that combine retry and observability wiring are available in `examples/sample_starter_templates.py`.
+
 Lifecycle event names:
 - `query.start`, `query.end`
 - `retry.scheduled`, `retry.giveup`

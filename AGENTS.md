@@ -206,6 +206,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Hardened table/schema/column/alias handling in select/cte/subquery/table/ddl constraint/index/drop-column compilation paths to reject unsafe identifiers.
     *   Added cross-dialect hostile-input tests to verify unsafe identifiers are rejected and valid expressions like `COUNT(*)` continue to compile.
     *   **Important downstream maintenance**: when adding new compiler-emitted identifier fields, route them through identifier validation and extend `test_compiler_identifier_security.py`.
+*   **Starter Templates for Common Flows**:
+    *   Added `examples/sample_starter_templates.py` with syntax-first, copy-paste templates for CRUD, upsert, transaction, retry, and observability wiring.
+    *   Updated user/developer docs to point to the starter template entrypoint.
+    *   **Important downstream maintenance**: when the public AST/executor workflow changes for CRUD/upsert/transaction/retry/observability paths, keep `sample_starter_templates.py` and linked docs aligned.
 
 ---
 
@@ -236,6 +240,7 @@ This project aims to create a query builder for Python with support for PostgreS
     *   **Downstream changes**: any additional updates needed because of this change.
     *   **Goal alignment**: how the change achieves the conversation goal.
 *   Only write edits to files after explicit user approval.
+*   Every new change written to a file must also include any necessary corresponding update to `AGENTS.md`.
 
 ### Security-First Update Requirement
 *   For **all future updates**, perform a security analysis as part of the change.

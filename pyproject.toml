@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "buildaquery"
-version = "1.1.7"
+version = "1.1.8"
 description = "A Python SQL query builder with cross-dialect execution primitives and OLTP support."
 authors = ["Anirudh Bhattacharya <anirudhbhattacharya1@gmail.com>"]
 readme = "README.md"

@@ -588,7 +588,8 @@ drop_stmt = DropStatementNode(table=users_table, if_exists=True, cascade=True)
 executor.execute(drop_stmt)
 ```
 
-For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_duckdb.py`, `examples/sample_clickhouse.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
+For more examples, see the `examples/` directory (including `examples/sample_syntax_quickstart.py`, `examples/sample_starter_templates.py`, `examples/sample_duckdb.py`, `examples/sample_clickhouse.py`, `examples/sample_mysql.py`, `examples/sample_oracle.py`, `examples/sample_mssql.py`, `examples/sample_mariadb.py`, `examples/sample_cockroachdb.py`, `examples/sample_transactions.py`, `examples/sample_connection_management.py`, `examples/sample_observability.py`, and `examples/sample_observability_integration.py`).
+For copy-paste starter snippets across CRUD/upsert/transaction/retry/observability flows, see `examples/sample_starter_templates.py`.
 For boundary validation patterns with external payloads, see `examples/sample_validation.py`.
 For transaction control, see `examples/sample_transactions.py`.
 For normalized retry/error handling, use `RetryPolicy` with `*_with_retry(...)` executor APIs.
