@@ -87,6 +87,8 @@ Retry-enabled APIs normalize backend-specific exceptions into common types:
 - `IntegrityConstraintError`
 - `ProgrammingExecutionError`
 
+Normalized error messages include the dialect, operation, SQLSTATE when available, and a redacted placeholder-SQL snippet for debugging. Parameter values are not interpolated into the message.
+
 ### `PostgresExecutor`
 A concrete implementation for PostgreSQL using the `psycopg` library. It handles connection management and query parametrization automatically.
 

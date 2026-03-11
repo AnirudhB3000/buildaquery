@@ -210,6 +210,10 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Added `examples/sample_starter_templates.py` with syntax-first, copy-paste templates for CRUD, upsert, transaction, retry, and observability wiring.
     *   Updated user/developer docs to point to the starter template entrypoint.
     *   **Important downstream maintenance**: when the public AST/executor workflow changes for CRUD/upsert/transaction/retry/observability paths, keep `sample_starter_templates.py` and linked docs aligned.
+*   **Normalized Error Message Context**:
+    *   Extended normalized execution errors to include dialect, operation, SQLSTATE when available, and redacted placeholder SQL context.
+    *   Added unit coverage to verify SQL context truncation and that hostile values do not leak into error messages.
+    *   **Important downstream maintenance**: when adding new normalization paths, pass placeholder SQL context only and keep params out of exception strings and tests.
 
 ---
 

@@ -144,6 +144,7 @@ class Executor(ABC):
             dialect=self._dialect_name(),
             operation="execute_raw",
             sqlstate=None,
+            sql=sql,
             original_message=reason,
         )
         raise ProgrammingExecutionError(details, ValueError(reason))
@@ -179,11 +180,18 @@ class Executor(ABC):
         name = name.replace("executor", "")
         return name or "unknown"
 
-    def _normalize_execution_error(self, *, operation: str, exc: Exception) -> ExecutionError:
+    def _normalize_execution_error(
+        self,
+        *,
+        operation: str,
+        exc: Exception,
+        sql: str | None = None,
+    ) -> ExecutionError:
         return normalize_execution_error(
             dialect=self._dialect_name(),
             operation=operation,
             exc=exc,
+            sql=sql,
         )
 
     def _observe_query(
@@ -257,7 +265,11 @@ class Executor(ABC):
         policy = retry_policy or RetryPolicy()
         return run_with_retry(
             operation=lambda: self.execute(compiled_query),
-            normalize_error=lambda exc: self._normalize_execution_error(operation="execute", exc=exc),
+            normalize_error=lambda exc: self._normalize_execution_error(
+                operation="execute",
+                exc=exc,
+                sql=compiled_query.sql,
+            ),
             policy=policy,
             on_retry=lambda normalized, attempt, delay: self._emit_event(
                 "retry.scheduled",
@@ -288,7 +300,11 @@ class Executor(ABC):
         policy = retry_policy or RetryPolicy()
         return run_with_retry(
             operation=lambda: self.fetch_all(compiled_query),
-            normalize_error=lambda exc: self._normalize_execution_error(operation="fetch_all", exc=exc),
+            normalize_error=lambda exc: self._normalize_execution_error(
+                operation="fetch_all",
+                exc=exc,
+                sql=compiled_query.sql,
+            ),
             policy=policy,
             on_retry=lambda normalized, attempt, delay: self._emit_event(
                 "retry.scheduled",
@@ -319,7 +335,11 @@ class Executor(ABC):
         policy = retry_policy or RetryPolicy()
         return run_with_retry(
             operation=lambda: self.fetch_one(compiled_query),
-            normalize_error=lambda exc: self._normalize_execution_error(operation="fetch_one", exc=exc),
+            normalize_error=lambda exc: self._normalize_execution_error(
+                operation="fetch_one",
+                exc=exc,
+                sql=compiled_query.sql,
+            ),
             policy=policy,
             on_retry=lambda normalized, attempt, delay: self._emit_event(
                 "retry.scheduled",
@@ -351,7 +371,11 @@ class Executor(ABC):
         policy = retry_policy or RetryPolicy()
         run_with_retry(
             operation=lambda: self.execute_many(sql, param_sets),
-            normalize_error=lambda exc: self._normalize_execution_error(operation="execute_many", exc=exc),
+            normalize_error=lambda exc: self._normalize_execution_error(
+                operation="execute_many",
+                exc=exc,
+                sql=sql,
+            ),
             policy=policy,
             on_retry=lambda normalized, attempt, delay: self._emit_event(
                 "retry.scheduled",

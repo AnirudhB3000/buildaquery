@@ -19,6 +19,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Execution Layer**: Built-in support for executing compiled queries via `psycopg` (PostgreSQL/CockroachDB), `duckdb` (DuckDB), `clickhouse-driver` (ClickHouse), `mysql-connector-python` (MySQL), `mariadb` (MariaDB), `oracledb` (Oracle), `pyodbc` (SQL Server), and the standard library `sqlite3` (SQLite).
 - **Transaction APIs**: First-class transaction control with `begin()`, `commit()`, `rollback()`, `savepoint()`, `rollback_to_savepoint()`, and `release_savepoint()` across executors.
 - **Normalized Error + Retry APIs**: Execution retry helpers (`execute_with_retry`, `fetch_all_with_retry`, `fetch_one_with_retry`, `execute_many_with_retry`) with normalized error types for deadlocks/serialization/lock timeouts/connection timeouts.
+- **Actionable Error Context**: Normalized execution errors include dialect, operation, SQLSTATE when available, and redacted placeholder SQL context.
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
 - **Observability Hooks**: Structured query observations plus lifecycle logging events (query/retry/transaction/connection) via `ObservabilitySettings`.
 - **Boundary Input Validation (Optional)**: Minimal Pydantic models/translators for validating external config and raw execution payloads before executor usage.

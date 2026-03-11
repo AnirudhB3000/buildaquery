@@ -60,6 +60,12 @@ Optional resilience path:
 9. If input comes from external sources, validate it first with the optional `buildaquery.validation` models/translators.
 10. If your app must block ad-hoc raw SQL, set `raw_sql_policy="deny_untrusted"` or `raw_sql_policy="deny_all"` on executors.
 
+Normalized execution errors include:
+- dialect
+- operation
+- SQLSTATE when available
+- redacted placeholder SQL context
+
 ## Optional Boundary Validation
 
 Use minimal Pydantic validation at the app boundary for external payloads (API/CLI/job/env input).

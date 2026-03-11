@@ -18,7 +18,18 @@ class ExecutionErrorDetails:
     dialect: str
     operation: str
     sqlstate: str | None
+    sql: str | None
     original_message: str
+
+
+def _redact_sql(sql: str | None, *, max_length: int = 160) -> str | None:
+    if sql is None:
+        return None
+
+    collapsed = " ".join(sql.split())
+    if len(collapsed) <= max_length:
+        return collapsed
+    return f"{collapsed[:max_length]}..."
 
 
 class ExecutionError(Exception):
@@ -29,8 +40,11 @@ class ExecutionError(Exception):
     def __init__(self, details: ExecutionErrorDetails, original_exception: Exception) -> None:
         self.details = details
         self.original_exception = original_exception
+        sqlstate_part = f" sqlstate={details.sqlstate}" if details.sqlstate else ""
+        sql_part = f" sql={details.sql!r}" if details.sql else ""
         super().__init__(
-            f"[{details.dialect}:{details.operation}] {self.__class__.__name__}: {details.original_message}"
+            f"[{details.dialect}:{details.operation}{sqlstate_part}] {self.__class__.__name__}: "
+            f"{details.original_message}{sql_part}"
         )
 
 
@@ -85,6 +99,7 @@ def normalize_execution_error(
     dialect: str,
     operation: str,
     exc: Exception,
+    sql: str | None = None,
 ) -> ExecutionError:
     """
     Maps driver exceptions to a normalized execution error taxonomy.
@@ -95,6 +110,7 @@ def normalize_execution_error(
         dialect=dialect,
         operation=operation,
         sqlstate=sqlstate,
+        sql=_redact_sql(sql),
         original_message=str(exc),
     )
 

@@ -25,6 +25,7 @@ def test_normalize_deadlock_by_sqlstate() -> None:
     assert isinstance(err, DeadlockError)
     assert err.details.dialect == "postgres"
     assert err.details.operation == "execute"
+    assert err.details.sql is None
 
 
 def test_normalize_serialization_by_sqlstate() -> None:
@@ -80,3 +81,43 @@ def test_normalize_generic_execution_error_fallback() -> None:
     )
     assert isinstance(err, ExecutionError)
     assert type(err) is ExecutionError
+
+
+def test_normalized_error_message_includes_sqlstate_and_redacted_sql() -> None:
+    err = normalize_execution_error(
+        dialect="postgres",
+        operation="fetch_all",
+        exc=_FakeDriverError("syntax error at or near SELECT", "42601"),
+        sql="SELECT id, email FROM users WHERE active = %s ORDER BY id",
+    )
+
+    assert "sqlstate=42601" in str(err)
+    assert "sql='SELECT id, email FROM users WHERE active = %s ORDER BY id'" in str(err)
+    assert err.details.sql == "SELECT id, email FROM users WHERE active = %s ORDER BY id"
+
+
+def test_normalized_error_redacts_by_keeping_placeholders_not_hostile_values() -> None:
+    hostile_value = "x'; DROP TABLE users; --"
+    err = normalize_execution_error(
+        dialect="sqlite",
+        operation="execute",
+        exc=_FakeDriverError("database is locked"),
+        sql="SELECT id FROM users WHERE email = ?",
+    )
+
+    assert hostile_value not in str(err)
+    assert "sql='SELECT id FROM users WHERE email = ?'" in str(err)
+
+
+def test_normalized_error_truncates_long_sql_context() -> None:
+    sql = "SELECT " + ", ".join([f"col_{idx}" for idx in range(40)]) + " FROM very_large_table WHERE active = %s"
+    err = normalize_execution_error(
+        dialect="postgres",
+        operation="fetch_all",
+        exc=_FakeDriverError("unknown failure"),
+        sql=sql,
+    )
+
+    assert err.details.sql is not None
+    assert len(err.details.sql) <= 163
+    assert err.details.sql.endswith("...")
