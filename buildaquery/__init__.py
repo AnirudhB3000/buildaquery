@@ -45,6 +45,7 @@ from buildaquery.execution import (
     execution_event_to_dict,
     make_json_event_logger,
 )
+from buildaquery.seeding import SeedRunError, SeedRunSummary, SeedRunner, SeedStep
 
 try:
     __version__ = version("buildaquery")
@@ -94,4 +95,8 @@ __all__ = [
     "ConnectionTimeoutError",
     "IntegrityConstraintError",
     "ProgrammingExecutionError",
+    "SeedStep",
+    "SeedRunner",
+    "SeedRunSummary",
+    "SeedRunError",
 ]

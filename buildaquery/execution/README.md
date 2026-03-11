@@ -95,6 +95,41 @@ For manually constructed `CompiledQuery(...)` objects and `execute_raw(...)` cal
 
 The rewrite is placeholder-only. Values stay in the separate params list and are not interpolated into SQL text.
 
+### Deterministic Seeding
+
+For simple bootstrap data flows, use `SeedRunner` and ordered `SeedStep(...)` definitions from `buildaquery.seeding`.
+
+- Supports AST statements, `CompiledQuery(...)`, and executor callbacks.
+- Wraps the run in a transaction by default when the executor supports transactions.
+- Reuses the normal executor pipeline, so observability, retries, and raw-SQL policy enforcement still apply.
+
+```python
+from buildaquery.abstract_syntax_tree.models import ColumnNode, InsertStatementNode, LiteralNode, TableNode
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.seeding import SeedRunner, SeedStep
+
+steps = [
+    SeedStep(
+        name="insert-admin",
+        action=InsertStatementNode(
+            table=TableNode(name="users"),
+            columns=[ColumnNode(name="id"), ColumnNode(name="email")],
+            values=[LiteralNode(1), LiteralNode("admin@example.com")],
+        ),
+    ),
+    SeedStep(
+        name="insert-auditor",
+        action=CompiledQuery(
+            sql="INSERT INTO users (id, email) VALUES (?, ?)",
+            params=[2, "auditor@example.com"],
+        ),
+    ),
+]
+
+summary = SeedRunner(transactional=True).run(executor, steps)
+print(summary.completed_steps)
+```
+
 ### Observability Hooks
 
 All executors support observability through `ObservabilitySettings`:

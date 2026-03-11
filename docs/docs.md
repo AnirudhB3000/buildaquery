@@ -61,6 +61,7 @@ Optional resilience path:
 10. If your app must block ad-hoc raw SQL, set `raw_sql_policy="deny_untrusted"` or `raw_sql_policy="deny_all"` on executors.
 11. For manual SQL inputs, you may use dict-style named params with `:name` markers; executors rewrite them to the target dialect placeholders before execution.
 12. If your app needs dialect-aware branching, use `executor.capabilities()` instead of hardcoding backend names.
+13. If you need deterministic bootstrap data, use `SeedRunner` and `SeedStep` on top of your existing executor.
 
 Normalized execution errors include:
 - dialect
@@ -193,6 +194,41 @@ if caps.select_for_update and caps.lock_skip_locked:
 
 if caps.insert_returning:
     print("safe to rely on INSERT ... RETURNING / OUTPUT")
+```
+
+## Deterministic Seeding
+
+Use `SeedRunner` and `SeedStep` for small, ordered bootstrap data flows.
+
+- Supports AST statements, `CompiledQuery(...)`, and executor callbacks.
+- Wraps the run in a transaction by default when the executor supports transactions.
+- Callback steps still obey executor security rules such as `raw_sql_policy` on `execute_raw(...)`.
+
+```python
+from buildaquery.abstract_syntax_tree.models import ColumnNode, InsertStatementNode, LiteralNode, TableNode
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.seeding import SeedRunner, SeedStep
+
+steps = [
+    SeedStep(
+        name="insert-admin",
+        action=InsertStatementNode(
+            table=TableNode(name="users"),
+            columns=[ColumnNode(name="id"), ColumnNode(name="email")],
+            values=[LiteralNode(1), LiteralNode("admin@example.com")],
+        ),
+    ),
+    SeedStep(
+        name="insert-auditor",
+        action=CompiledQuery(
+            sql="INSERT INTO users (id, email) VALUES (?, ?)",
+            params=[2, "auditor@example.com"],
+        ),
+    ),
+]
+
+summary = SeedRunner(transactional=True).run(executor, steps)
+print(summary.completed_steps)
 ```
 ## OLTP Features
 

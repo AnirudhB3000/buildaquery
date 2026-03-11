@@ -28,6 +28,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **SQL Preview Helpers**: `compiler.to_sql(...)`, `executor.to_sql(...)`, and `CompiledQuery.to_sql()` expose placeholder-based SQL plus separate params for safe debug/inspection.
 - **Named-Parameter Convenience**: Executors accept dict-style params for manual `CompiledQuery(...)` and `execute_raw(...)` inputs, rewriting `:name` markers into each dialect's native placeholders.
 - **Capability Introspection**: `executor.capabilities()` exposes explicit dialect support flags so applications can branch safely on transactions, savepoints, returning, upsert, and lock-clause features.
+- **Deterministic Seeding**: `SeedRunner` and `SeedStep` provide a small first-party seeding utility for ordered bootstrap data flows.
 
 ## OLTP Capabilities
 
@@ -258,6 +259,42 @@ if capabilities.insert_returning:
     print("Can fetch rows directly from INSERT")
 
 print(capabilities.to_dict())
+```
+
+## Deterministic Seeding
+
+Use `SeedRunner` when you want a small, first-party way to load deterministic bootstrap data through the existing executor APIs.
+
+- Steps run in order.
+- AST statements, `CompiledQuery(...)`, and executor callbacks are supported.
+- Transaction wrapping is enabled by default when the executor supports transactions.
+- Raw SQL callback steps still obey `execute_raw(...)` policy enforcement.
+
+```python
+from buildaquery.abstract_syntax_tree.models import ColumnNode, InsertStatementNode, LiteralNode, TableNode
+from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.seeding import SeedRunner, SeedStep
+
+steps = [
+    SeedStep(
+        name="insert-admin",
+        action=InsertStatementNode(
+            table=TableNode(name="users"),
+            columns=[ColumnNode(name="id"), ColumnNode(name="email")],
+            values=[LiteralNode(1), LiteralNode("admin@example.com")],
+        ),
+    ),
+    SeedStep(
+        name="insert-auditor",
+        action=CompiledQuery(
+            sql="INSERT INTO users (id, email) VALUES (?, ?)",
+            params=[2, "auditor@example.com"],
+        ),
+    ),
+]
+
+summary = SeedRunner(transactional=True).run(executor, steps)
+print(summary.completed_steps)
 ```
 ## Quick Start
 

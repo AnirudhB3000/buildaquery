@@ -12,6 +12,9 @@ from buildaquery import (
     ObservabilitySettings,
     PostgresExecutor,
     RetryPolicy,
+    SeedRunSummary,
+    SeedRunner,
+    SeedStep,
     SqliteCompiler,
 )
 from buildaquery.compiler import CompiledQuery as CompiledQueryFromCompiler
@@ -34,6 +37,9 @@ def test_root_public_api_exports_are_importable() -> None:
     assert DuckDbExecutor is not None
     assert ClickHouseCompiler is not None
     assert ClickHouseExecutor is not None
+    assert SeedStep is not None
+    assert SeedRunner is not None
+    assert SeedRunSummary is not None
 
 
 def test_compiler_exports_include_compiled_query() -> None:
