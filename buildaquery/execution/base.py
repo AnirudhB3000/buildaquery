@@ -17,6 +17,30 @@ from buildaquery.execution.retry import RetryPolicy, run_with_retry
 
 RawSqlPolicy = Literal["allow", "deny_untrusted", "deny_all"]
 
+
+class _TransactionContext:
+    """
+    Context manager for explicit executor-managed transactions.
+    """
+
+    def __init__(self, executor: "Executor", isolation_level: str | None = None) -> None:
+        self._executor = executor
+        self._isolation_level = isolation_level
+
+    def __enter__(self) -> "Executor":
+        self._executor.begin(self._isolation_level)
+        return self._executor
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        _ = exc_type
+        _ = exc
+        _ = tb
+        if exc_type is None:
+            self._executor.commit()
+            return False
+        self._executor.rollback()
+        return False
+
 # ==================================================
 # Base Executor
 # ==================================================
@@ -65,6 +89,12 @@ class Executor(ABC):
         if compiler is None or not hasattr(compiler, "compile"):
             raise RuntimeError("Executor does not expose a compiler for to_sql().")
         return compiler.compile(query)
+
+    def transaction(self, isolation_level: str | None = None) -> _TransactionContext:
+        """
+        Returns a context manager that commits on success and rolls back on error.
+        """
+        return _TransactionContext(self, isolation_level)
 
     @abstractmethod
     def begin(self, isolation_level: str | None = None) -> None:

@@ -150,6 +150,7 @@ print(preview.params)
 For transactional workloads, Build-a-Query provides:
 
 - Transaction control APIs: `begin()`, `commit()`, `rollback()`, `savepoint(name)`, `rollback_to_savepoint(name)`, and `release_savepoint(name)`.
+- Transaction context helper: `with executor.transaction(): ...` commits on success and rolls back on failure.
   - DuckDB note: savepoint APIs are runtime-version dependent; unsupported runtimes raise a clear executor `RuntimeError`.
   - ClickHouse note: explicit transaction/savepoint APIs are not supported by `ClickHouseExecutor`.
 - Concurrency lock clauses on `SELECT` (dialect-aware), including `NOWAIT` and `SKIP LOCKED` on supported backends.
@@ -176,14 +177,10 @@ from buildaquery.execution.retry import RetryPolicy
 executor = PostgresExecutor(connection_info="postgresql://user:password@localhost:5432/mydb")
 policy = RetryPolicy(max_attempts=3)
 
-executor.begin()
 try:
-    executor.execute_with_retry("UPDATE accounts SET balance = balance - %s WHERE id = %s", [50, 1], policy=policy)
-    executor.execute_with_retry("UPDATE accounts SET balance = balance + %s WHERE id = %s", [50, 2], policy=policy)
-    executor.commit()
-except Exception:
-    executor.rollback()
-    raise
+    with executor.transaction():
+        executor.execute_with_retry("UPDATE accounts SET balance = balance - %s WHERE id = %s", [50, 1], policy=policy)
+        executor.execute_with_retry("UPDATE accounts SET balance = balance + %s WHERE id = %s", [50, 2], policy=policy)
 finally:
     executor.close()
 ```

@@ -21,12 +21,14 @@ An abstract base class that defines the interface for all database executors.
 - `begin(isolation_level=None)`: Starts an explicit transaction.
 - `commit()`: Commits the active explicit transaction.
 - `rollback()`: Rolls back the active explicit transaction.
+- `transaction(isolation_level=None)`: Returns a context manager that commits on success and rolls back on error.
 - `savepoint(name)`: Creates a savepoint in the active transaction.
 - `rollback_to_savepoint(name)`: Rolls back to a savepoint.
 - `release_savepoint(name)`: Releases a savepoint when supported by the dialect.
 
 Executors also support context manager lifecycle control:
 - `with PostgresExecutor(...) as executor: ...` (calls `close()` on exit).
+- `with executor.transaction(): ...` (calls `begin()` on entry, `commit()` on success, `rollback()` on exception).
 
 ### Connection Management
 
@@ -151,13 +153,13 @@ rows = executor.fetch_all(compiled)
 for row in rows:
     print(row)
 
-# 4. Explicit transaction control
-executor.begin()
-executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Alice"]))
-executor.savepoint("after_alice")
-executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Bob"]))
-executor.rollback_to_savepoint("after_alice")
-executor.commit()
+# 4. Explicit transaction control via context manager
+with executor.transaction():
+    executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Alice"]))
+    executor.savepoint("after_alice")
+    executor.execute(CompiledQuery(sql="INSERT INTO users(name) VALUES (%s)", params=["Bob"]))
+    executor.rollback_to_savepoint("after_alice")
+    executor.release_savepoint("after_alice")
 
 # 5. Driver-level bulk writes
 executor.execute_many(

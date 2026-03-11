@@ -214,6 +214,11 @@ This project aims to create a query builder for Python with support for PostgreS
     *   Extended normalized execution errors to include dialect, operation, SQLSTATE when available, and redacted placeholder SQL context.
     *   Added unit coverage to verify SQL context truncation and that hostile values do not leak into error messages.
     *   **Important downstream maintenance**: when adding new normalization paths, pass placeholder SQL context only and keep params out of exception strings and tests.
+*   **Transaction Context Helper**:
+    *   Added `executor.transaction(isolation_level=None)` as a shared context manager for automatic `begin()`/`commit()`/`rollback()` handling.
+    *   Added unit and SQLite integration coverage for commit-on-success, rollback-on-error, and isolation-level forwarding behavior.
+    *   Updated transaction examples and docs to show `with executor.transaction(): ...` as the preferred ergonomic path.
+    *   **Important downstream maintenance**: when transaction lifecycle behavior changes, keep the explicit APIs and the context helper semantics aligned across executors and tests.
 
 ---
 

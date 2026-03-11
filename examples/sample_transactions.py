@@ -42,26 +42,25 @@ def main() -> None:
         )
     )
 
-    # Transaction with savepoint
-    executor.begin()
-    executor.execute(
-        InsertStatementNode(
-            table=users_table,
-            columns=[ColumnNode(name="id"), ColumnNode(name="name")],
-            values=[LiteralNode(value=1), LiteralNode(value="Alice")],
+    # Transaction with context-managed commit/rollback plus savepoint control
+    with executor.transaction():
+        executor.execute(
+            InsertStatementNode(
+                table=users_table,
+                columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+                values=[LiteralNode(value=1), LiteralNode(value="Alice")],
+            )
         )
-    )
-    executor.savepoint("after_alice")
-    executor.execute(
-        InsertStatementNode(
-            table=users_table,
-            columns=[ColumnNode(name="id"), ColumnNode(name="name")],
-            values=[LiteralNode(value=2), LiteralNode(value="Bob")],
+        executor.savepoint("after_alice")
+        executor.execute(
+            InsertStatementNode(
+                table=users_table,
+                columns=[ColumnNode(name="id"), ColumnNode(name="name")],
+                values=[LiteralNode(value=2), LiteralNode(value="Bob")],
+            )
         )
-    )
-    executor.rollback_to_savepoint("after_alice")
-    executor.release_savepoint("after_alice")
-    executor.commit()
+        executor.rollback_to_savepoint("after_alice")
+        executor.release_savepoint("after_alice")
 
     rows = executor.execute(SelectStatementNode(select_list=[StarNode()], from_table=users_table))
     print(rows)

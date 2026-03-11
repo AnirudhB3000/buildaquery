@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from buildaquery.compiler.compiled_query import CompiledQuery
+from buildaquery.execution.base import Executor
 from buildaquery.execution.mssql import MsSqlExecutor
 from buildaquery.execution.mysql import MySqlExecutor
 from buildaquery.execution.postgres import PostgresExecutor
@@ -84,6 +85,86 @@ def test_sqlite_pool_hooks_release_connection() -> None:
         keeper.close()
         if db_path.exists():
             db_path.unlink()
+
+
+def test_sqlite_transaction_context_commits_on_success() -> None:
+    conn = sqlite3.connect(":memory:")
+    executor = SqliteExecutor(connection=conn)
+    executor.execute_raw("CREATE TABLE t_ctx (id INTEGER PRIMARY KEY, value TEXT)")
+
+    with executor.transaction():
+        executor.execute(CompiledQuery(sql="INSERT INTO t_ctx (id, value) VALUES (?, ?)", params=[1, "ok"]))
+
+    rows = executor.fetch_all(CompiledQuery(sql="SELECT id, value FROM t_ctx", params=[]))
+    assert rows == [(1, "ok")]
+    conn.close()
+
+
+def test_sqlite_transaction_context_rolls_back_on_error() -> None:
+    conn = sqlite3.connect(":memory:")
+    executor = SqliteExecutor(connection=conn)
+    executor.execute_raw("CREATE TABLE t_ctx_rb (id INTEGER PRIMARY KEY, value TEXT)")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        with executor.transaction():
+            executor.execute(CompiledQuery(sql="INSERT INTO t_ctx_rb (id, value) VALUES (?, ?)", params=[1, "x"]))
+            raise RuntimeError("boom")
+
+    rows = executor.fetch_all(CompiledQuery(sql="SELECT id, value FROM t_ctx_rb", params=[]))
+    assert rows == []
+    conn.close()
+
+
+class _TrackingExecutor(Executor):
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def execute(self, compiled_query: CompiledQuery) -> None:
+        _ = compiled_query
+        return None
+
+    def fetch_all(self, compiled_query: CompiledQuery) -> list[tuple[str]]:
+        _ = compiled_query
+        return []
+
+    def fetch_one(self, compiled_query: CompiledQuery) -> tuple[str] | None:
+        _ = compiled_query
+        return None
+
+    def execute_many(self, sql: str, param_sets: list[list[object]]) -> None:
+        _ = sql
+        _ = param_sets
+        return None
+
+    def begin(self, isolation_level: str | None = None) -> None:
+        self.calls.append(f"begin:{isolation_level}")
+
+    def commit(self) -> None:
+        self.calls.append("commit")
+
+    def rollback(self) -> None:
+        self.calls.append("rollback")
+
+    def savepoint(self, name: str) -> None:
+        _ = name
+        return None
+
+    def rollback_to_savepoint(self, name: str) -> None:
+        _ = name
+        return None
+
+    def release_savepoint(self, name: str) -> None:
+        _ = name
+        return None
+
+
+def test_transaction_context_forwards_isolation_level() -> None:
+    executor = _TrackingExecutor()
+
+    with executor.transaction("SERIALIZABLE"):
+        pass
+
+    assert executor.calls == ["begin:SERIALIZABLE", "commit"]
 
 
 def test_postgres_connect_timeout_is_forwarded() -> None:
