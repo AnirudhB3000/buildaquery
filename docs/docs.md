@@ -49,6 +49,7 @@ poetry install
 1. Build an AST query object.
 2. Execute it with the executor for your database.
 3. Let Build-a-Query compile and parameterize automatically.
+4. Use `to_sql()` on a compiler or executor when you want a safe SQL preview before execution.
 
 Optional resilience path:
 4. Use `RetryPolicy` + `execute_with_retry(...)` (or `fetch_all_with_retry(...)` / `fetch_one_with_retry(...)` / `execute_many_with_retry(...)`) to retry transient failures using normalized execution errors.
@@ -109,6 +110,35 @@ executor = SqliteExecutor(
 executor.execute_raw("CREATE TABLE t (id INTEGER PRIMARY KEY)", trusted=True)
 ```
 
+## SQL Preview
+
+Use `to_sql()` to inspect generated SQL without executing it:
+
+- `compiler.to_sql(ast)` returns a `CompiledQuery`
+- `executor.to_sql(ast_or_compiled)` returns a `CompiledQuery`
+- `CompiledQuery.to_sql()` returns the placeholder SQL string
+
+Parameter values remain in `CompiledQuery.params`; they are not interpolated into the SQL text.
+
+```python
+from buildaquery.abstract_syntax_tree.models import ColumnNode, SelectStatementNode, TableNode
+from buildaquery.compiler import SqliteCompiler
+from buildaquery.execution.sqlite import SqliteExecutor
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id")],
+    from_table=TableNode(name="users"),
+)
+
+compiled = SqliteCompiler().to_sql(query)
+print(compiled.to_sql())
+print(compiled.params)
+
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+preview = executor.to_sql(query)
+print(preview.to_sql())
+print(preview.params)
+```
 ## OLTP Features
 
 For transactional workloads, Build-a-Query provides:
@@ -537,3 +567,6 @@ poetry run package-check
   - `buildaquery/traversal/`
   - `buildaquery/compiler/`
   - `buildaquery/execution/`
+
+
+

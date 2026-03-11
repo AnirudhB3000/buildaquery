@@ -80,6 +80,12 @@ class OracleCompiler(Visitor):
         sql = self.visit(node)
         return CompiledQuery(sql=sql, params=self._params)
 
+    def to_sql(self, node: ASTNode) -> CompiledQuery:
+        """
+        Compiles an AST node for debug and inspection flows.
+        """
+        return self.compile(node)
+
     # --------------------------------------------------
     # Statement Nodes
     # --------------------------------------------------
@@ -588,3 +594,4 @@ class OracleCompiler(Visitor):
             raise ValueError("Oracle does not support IF EXISTS in DROP CONSTRAINT.")
         cascade = " CASCADE" if node.cascade else ""
         return f"DROP CONSTRAINT {node.constraint_name}{cascade}"
+

@@ -12,6 +12,7 @@ An abstract base class that defines the interface for all database executors.
 - `fetch_all(compiled_query)`: Returns all rows matching the query.
 - `fetch_one(compiled_query)`: Returns the first row matching the query.
 - `execute_many(sql, param_sets)`: Runs one SQL statement against multiple parameter sets (bulk write path).
+- `to_sql(ast_or_compiled)`: Returns a `CompiledQuery` preview without executing it.
 - `execute_with_retry(compiled_query, retry_policy=None)`: Executes with transient-failure retries and normalized errors.
 - `fetch_all_with_retry(compiled_query, retry_policy=None)`: Fetches all rows with transient-failure retries and normalized errors.
 - `fetch_one_with_retry(compiled_query, retry_policy=None)`: Fetches one row with transient-failure retries and normalized errors.
@@ -48,6 +49,10 @@ All executors accept `raw_sql_policy`:
 - `deny_all`: blocks all `execute_raw(...)` calls.
 
 When blocked, executors raise `ProgrammingExecutionError` and emit `security.execute_raw.blocked` lifecycle events.
+
+### SQL Preview
+
+Executors expose `to_sql(ast_or_compiled)` to preview the exact placeholder SQL and params they would execute. This helper does not execute anything and does not interpolate param values into SQL text.
 
 ### Observability Hooks
 
@@ -295,3 +300,6 @@ Different executors require specific database drivers:
 - `DuckDbExecutor` requires `duckdb` (`pip install duckdb`).
 - `ClickHouseExecutor` requires `clickhouse-driver` (`pip install clickhouse-driver`).
 - Optional boundary validation utilities require `pydantic` (`pip install "buildaquery[validation]"`).
+
+
+

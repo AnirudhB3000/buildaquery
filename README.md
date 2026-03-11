@@ -22,6 +22,7 @@ A Python-based query builder designed to represent, compile, and execute SQL que
 - **Connection Management Controls**: Executor lifecycle management (`close`, context manager), connect timeout configuration (`connect_timeout_seconds`), and pool hooks (`acquire_connection`, `release_connection`).
 - **Observability Hooks**: Structured query observations plus lifecycle logging events (query/retry/transaction/connection) via `ObservabilitySettings`.
 - **Boundary Input Validation (Optional)**: Minimal Pydantic models/translators for validating external config and raw execution payloads before executor usage.
+- **SQL Preview Helpers**: `compiler.to_sql(...)`, `executor.to_sql(...)`, and `CompiledQuery.to_sql()` expose placeholder-based SQL plus separate params for safe debug/inspection.
 
 ## OLTP Capabilities
 
@@ -180,6 +181,30 @@ Activate the virtual environment:
 poetry shell
 ```
 
+
+## Debugging SQL
+
+Use `to_sql()` when you want to inspect generated SQL without executing it. The returned SQL always keeps dialect placeholders intact; values stay in `params`, which avoids turning the debug path into an interpolation or logging risk.
+
+```python
+from buildaquery.abstract_syntax_tree.models import ColumnNode, SelectStatementNode, TableNode
+from buildaquery.compiler import PostgresCompiler
+from buildaquery.execution.sqlite import SqliteExecutor
+
+query = SelectStatementNode(
+    select_list=[ColumnNode(name="id")],
+    from_table=TableNode(name="users"),
+)
+
+compiled = PostgresCompiler().to_sql(query)
+print(compiled.to_sql())
+print(compiled.params)
+
+executor = SqliteExecutor(connection_info="static/test-sqlite/db.sqlite")
+preview = executor.to_sql(query)
+print(preview.to_sql())
+print(preview.params)
+```
 ## Quick Start
 
 For the fastest first run, start with SQLite in the section below (`### SQLite Quick Start (Recommended)`), which requires no external database server.
@@ -674,3 +699,5 @@ For package release steps, see [RELEASES.md](RELEASES.md).
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.
+
+

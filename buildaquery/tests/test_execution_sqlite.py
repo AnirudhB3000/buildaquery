@@ -1,6 +1,14 @@
 import pytest
 import sqlite3
 
+from buildaquery.abstract_syntax_tree.models import (
+    BinaryOperationNode,
+    ColumnNode,
+    LiteralNode,
+    SelectStatementNode,
+    TableNode,
+    WhereClauseNode,
+)
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.execution.sqlite import SqliteExecutor
 
@@ -83,4 +91,26 @@ def test_sqlite_transaction_errors():
     with pytest.raises(RuntimeError):
         executor.begin()
     executor.rollback()
+    conn.close()
+
+
+def test_sqlite_executor_to_sql_compiles_without_execution():
+    conn = sqlite3.connect(":memory:")
+    executor = SqliteExecutor(connection=conn)
+    query = SelectStatementNode(
+        select_list=[ColumnNode(name="id")],
+        from_table=TableNode(name="users"),
+        where_clause=WhereClauseNode(
+            condition=BinaryOperationNode(
+                left=ColumnNode(name="email"),
+                operator="=",
+                right=LiteralNode(value="alice@example.com"),
+            )
+        ),
+    )
+
+    compiled = executor.to_sql(query)
+
+    assert compiled.sql == "SELECT id FROM users WHERE (email = ?)"
+    assert compiled.params == ["alice@example.com"]
     conn.close()

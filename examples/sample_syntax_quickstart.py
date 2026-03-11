@@ -23,14 +23,15 @@ def main() -> None:
         ),
     )
 
-    sqlite_compiled = SqliteCompiler().compile(query)
-    postgres_compiled = PostgresCompiler().compile(query)
+    sqlite_compiled = SqliteCompiler().to_sql(query)
+    postgres_compiled = PostgresCompiler().to_sql(query)
 
-    print("SQLite SQL:", sqlite_compiled.sql)
+    print("SQLite SQL:", sqlite_compiled.to_sql())
     print("SQLite params:", sqlite_compiled.params)
-    print("PostgreSQL SQL:", postgres_compiled.sql)
+    print("PostgreSQL SQL:", postgres_compiled.to_sql())
     print("PostgreSQL params:", postgres_compiled.params)
 
 
 if __name__ == "__main__":
     main()
+

@@ -82,6 +82,12 @@ class PostgresCompiler(Visitor):
         sql = self.visit(node)
         return CompiledQuery(sql=sql, params=self._params)
 
+    def to_sql(self, node: ASTNode) -> CompiledQuery:
+        """
+        Compiles an AST node for debug and inspection flows.
+        """
+        return self.compile(node)
+
     # --------------------------------------------------
     # Statement Nodes
     # --------------------------------------------------

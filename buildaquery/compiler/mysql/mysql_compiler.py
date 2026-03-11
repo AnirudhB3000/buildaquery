@@ -79,6 +79,12 @@ class MySqlCompiler(Visitor):
         sql = self.visit(node)
         return CompiledQuery(sql=sql, params=self._params)
 
+    def to_sql(self, node: ASTNode) -> CompiledQuery:
+        """
+        Compiles an AST node for debug and inspection flows.
+        """
+        return self.compile(node)
+
     # --------------------------------------------------
     # Statement Nodes
     # --------------------------------------------------
@@ -537,3 +543,4 @@ class MySqlCompiler(Visitor):
     def visit_DropConstraintActionNode(self, node: DropConstraintActionNode) -> str:
         _ = node
         raise ValueError("MySQL DROP CONSTRAINT is not supported in this compiler.")
+

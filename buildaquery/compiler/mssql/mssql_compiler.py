@@ -85,6 +85,12 @@ class MsSqlCompiler(Visitor):
         sql = self.visit(node)
         return CompiledQuery(sql=sql, params=self._params)
 
+    def to_sql(self, node: ASTNode) -> CompiledQuery:
+        """
+        Compiles an AST node for debug and inspection flows.
+        """
+        return self.compile(node)
+
     # --------------------------------------------------
     # Statement Nodes
     # --------------------------------------------------
@@ -623,3 +629,4 @@ class MsSqlCompiler(Visitor):
     def visit_DropConstraintActionNode(self, node: DropConstraintActionNode) -> str:
         if_exists = " IF EXISTS" if node.if_exists else ""
         return f"DROP CONSTRAINT{if_exists} {node.constraint_name}"
+

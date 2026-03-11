@@ -12,3 +12,9 @@ class CompiledQuery:
     """
     sql: str
     params: list[Any] = field(default_factory=list)
+
+    def to_sql(self) -> str:
+        """
+        Returns the placeholder-based SQL string for debug and inspection flows.
+        """
+        return self.sql

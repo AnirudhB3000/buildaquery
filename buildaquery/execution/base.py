@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import time
 from typing import Any, Literal, Mapping, Sequence
 from uuid import uuid4
+from buildaquery.abstract_syntax_tree.models import ASTNode
 from buildaquery.compiler.compiled_query import CompiledQuery
 from buildaquery.execution.errors import (
     ExecutionError,
@@ -52,6 +53,18 @@ class Executor(ABC):
         Executes a SQL statement against multiple parameter sets.
         """
         pass
+
+    def to_sql(self, query: CompiledQuery | ASTNode) -> CompiledQuery:
+        """
+        Returns the compiled placeholder SQL and params without executing it.
+        """
+        if isinstance(query, CompiledQuery):
+            return query
+
+        compiler = getattr(self, "compiler", None)
+        if compiler is None or not hasattr(compiler, "compile"):
+            raise RuntimeError("Executor does not expose a compiler for to_sql().")
+        return compiler.compile(query)
 
     @abstractmethod
     def begin(self, isolation_level: str | None = None) -> None:
@@ -380,3 +393,4 @@ class Executor(ABC):
         _ = exc
         _ = tb
         self.close()
+

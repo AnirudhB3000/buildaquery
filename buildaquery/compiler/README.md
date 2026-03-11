@@ -9,11 +9,16 @@ Every compiler returns a `CompiledQuery` object instead of a raw string. This en
 
 - **`sql` (str)**: The SQL query string containing placeholders (e.g., `%s` for PostgreSQL).
 - **`params` (list[Any])**: A list of values corresponding to the placeholders in the SQL string.
+- **`to_sql()`**: Returns the placeholder-based SQL text for debug/inspection without inlining params.
 
 ### Parametrization
 To prevent SQL injection, the compilers are designed to automatically parametrize all literal values. When a `LiteralNode` is encountered, the compiler:
 1. Appends a placeholder to the SQL string.
 2. Appends the literal value to the `params` list.
+
+### SQL Preview Helpers
+
+Compilers expose `to_sql(ast)` as a readability alias for `compile(ast)`. This is intended for debug/inspection flows where you want the generated SQL and params without execution.
 
 ## Implementations
 
@@ -162,9 +167,9 @@ from buildaquery.compiler.duckdb.duckdb_compiler import DuckDbCompiler
 from buildaquery.compiler.clickhouse.clickhouse_compiler import ClickHouseCompiler
 
 compiler = PostgresCompiler()
-compiled = compiler.compile(ast_root)
+compiled = compiler.to_sql(ast_root)
 
-print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.to_sql()) # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 
 sqlite_compiler = SqliteCompiler()
@@ -174,7 +179,7 @@ print(compiled.params) # [123]
 
 mysql_compiler = MySqlCompiler()
 compiled = mysql_compiler.compile(ast_root)
-print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.to_sql()) # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 
 oracle_compiler = OracleCompiler()
@@ -194,7 +199,7 @@ print(compiled.params) # [123]
 
 cockroach_compiler = CockroachDbCompiler()
 compiled = cockroach_compiler.compile(ast_root)
-print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.to_sql()) # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 
 duckdb_compiler = DuckDbCompiler()
@@ -204,6 +209,9 @@ print(compiled.params) # [123]
 
 clickhouse_compiler = ClickHouseCompiler()
 compiled = clickhouse_compiler.compile(ast_root)
-print(compiled.sql)    # "SELECT * FROM users WHERE id = %s"
+print(compiled.to_sql()) # "SELECT * FROM users WHERE id = %s"
 print(compiled.params) # [123]
 ```
+
+
+

@@ -80,6 +80,12 @@ class CockroachDbCompiler(Visitor):
         sql = self.visit(node)
         return CompiledQuery(sql=sql, params=self._params)
 
+    def to_sql(self, node: ASTNode) -> CompiledQuery:
+        """
+        Compiles an AST node for debug and inspection flows.
+        """
+        return self.compile(node)
+
     # --------------------------------------------------
     # Statement Nodes
     # --------------------------------------------------
@@ -552,3 +558,4 @@ class CockroachDbCompiler(Visitor):
         if_exists = " IF EXISTS" if node.if_exists else ""
         cascade = " CASCADE" if node.cascade else ""
         return f"DROP CONSTRAINT{if_exists} {node.constraint_name}{cascade}"
+
